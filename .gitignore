@@ -23,7 +23,7 @@ htmlcov/
 .tox/
 
 # ===== IDE =====
-.idea/          # PyCharm
+.idea/
 .vscode/
 
 # ===== 操作系统 =====
