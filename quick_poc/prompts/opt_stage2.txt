@@ -1,0 +1,12 @@
+【阶段 2：精炼语义定义与抽取规则】（基于阶段 1）
+【阶段 1 诊断与召回画像】
+{{stage1_json}}
+
+任务：彻底重构「语义定义」与「抽取规则」，修复所有 Badcase。
+⚠️ 必须【提炼泛化特征】，禁止针对具体公司名/金额/人名写规则（防过拟合）。
+只输出如下 JSON：
+{
+  "semantic_definition": "...",
+  "extraction_rules": {"absolute_interception_rules":[{"rule":"...","fixes":"针对哪个误抽"}],"core_match_rules":[{"rule":"...","fixes":"针对哪个漏抽"}]},
+  "self_consistency_check": "新拦截+匹配规则能否解决所有 Badcase"
+}

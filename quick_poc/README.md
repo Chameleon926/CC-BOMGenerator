@@ -1,61 +1,79 @@
 # quick_poc · 规则编排智能体（两个场景）
 
-## 两个场景
+## 怎么用（在哪填什么）
 
-| 场景 | `--mode` | 输入 | 做什么 | 要 Trace？ |
-|---|---|---|---|---|
-| **① 初始生成** | `generate` | 条款名 + 种子定义/规则 + 测试集期望值（**无 Badcase**） | 直接生成首版 BOM | 不需要 |
-| **② 已跑优化** | `optimize`（默认） | 当前 BOM + Badcase(期望/抽取) + 准确率 + Trace(多样) | 诊断(5类) → 优化 BOM | 需要，越全越准 |
+**一个条款 = 一个 yaml 文件。** 复制模板 → 改名 → 填字段 → 跑。
 
-> **核心区分**：误抽/漏抽（症状）只要期望值+抽取值就能定；**5 类归因（病因）必须靠 Trace**——
-> 召回 vs BOM 看原文窗口、BOM vs 推理看 reasoning、Prompt模板看提示词 I/O。
+| 你要填的 | yaml 字段 | 场景 |
+|---|---|---|
+| 条款名称 | `clause:` | ①② |
+| 当前语义定义 + 规则（旧 BOM） | `current_bom:`（粘贴现有） | ①② |
+| 测试集期望值（选正例用） | `positive_candidates:`（列表） | ①② |
+| 数量 / 语言 | `keyword_count` / `section_count` / `query_count` / `language_hint` | ①② |
+| **Badcase**（期望/抽取/原文） | `badcases:`（每条 type/expected/actual/text） | ② |
+| **Trace**（每条 badcase 的） | 每个 badcase 的 `trace:`（粘原文窗口/reasoning/prompt I/O） | ② |
 
-两场景都走**两步法**：召回画像(发散) → 抽取规则(收敛)，同一对话上下文连贯。
-
-## 运行
+模板：场景①用 `data/sample_generate.yaml`，场景②用 `data/sample_slice.yaml`。
 
 ```bash
 cd E:/Python_Project/CC-BOMGenerator
-cp .env.example .env                 # 填 LLM_API_KEY（LLM_BASE_URL 留空=默认端点；LLM_MODEL 填模型名）
+cp .env.example .env                 # 填 LLM_API_KEY（url 留空=默认端点）
 pip install -r quick_poc/requirements.txt
 
-# 场景① 初始生成
-python quick_poc/rule_pipeline.py quick_poc/data/sample_generate.yaml --mode generate
+# 场景① 初始生成（无 badcase）
+python quick_poc/rule_pipeline.py 你的条款.yaml --mode generate
 
-# 场景② 已跑优化
-python quick_poc/rule_pipeline.py quick_poc/data/sample_slice.yaml --mode optimize
+# 场景② 已跑优化（有 badcase + trace）
+python quick_poc/rule_pipeline.py 你的条款.yaml --mode optimize
 ```
 
-输出：终端打印两阶段 JSON + 最终 BOM；存档到 `quick_poc/output/new_bom_<mode>_<时间>.json`。
+输出：终端打印两阶段 JSON + 最终 BOM；存档到 `output/new_bom_<mode>_<时间>.json`。
+
+## 两个场景
+
+| 场景 | `--mode` | 输入 | 要 Trace？ |
+|---|---|---|---|
+| **① 初始生成** | `generate` | 名称 + 种子定义/规则 + 期望值（无 Badcase） | 不需要 |
+| **② 已跑优化** | `optimize`（默认） | 当前 BOM + Badcase(期望/抽取/**Trace**) + 准确率 | 需要，越全越准 |
+
+> 误抽/漏抽（症状）只要有期望值+抽取值就能定；**5 类归因（病因）必须靠 Trace**——
+> 召回看原文窗口、推理看 reasoning、Prompt模板看提示词 I/O。无 Trace 时只能低置信猜测类别。
+
+两场景都走**两步法**：召回画像(发散) → 抽取规则(收敛)，同一对话上下文连贯。
+
+## 提示词管理
+
+**提示词与代码分离**：所有 prompt 在 `prompts/`（纯文本 + `{{var}}` 占位），代码只加载渲染，不在代码里硬编码。
+
+```
+prompts/
+├─ system.txt       # 系统人设
+├─ recall.txt       # 召回画像规则（数量/语言占位，两场景共用）
+├─ opt_stage1.txt   # 场景② 阶段1：诊断+召回画像
+├─ opt_stage2.txt   # 场景② 阶段2：定义+规则
+├─ gen_stage1.txt   # 场景① 阶段1：召回画像生成
+└─ gen_stage2.txt   # 场景① 阶段2：定义+规则
+```
+改 prompt 直接编辑这些 txt，无需动代码。
 
 ## 输出契约
 
-### Stage 1
-- **generate**：`{ "recall_profile": {...} }`
-- **optimize**：`{ "diagnosis": [...], "recall_profile": {...} }`
-
+**Stage 1** — generate：`{"recall_profile":{...}}`；optimize：`{"diagnosis":[...],"recall_profile":{...}}`
 ```json
 "diagnosis": [{"case_id","case_type":"miss|false_positive","category":"5类之一","reason"}]
 "recall_profile": {"positive_keywords","confusion_words","section_hints","semantic_queries","positive_examples"}
 ```
-> `positive_keywords`：默认 **10 个**（yaml `keyword_count` 可配），**必须短词/短语、严禁整句**（精确匹配章节片段用，整句原文没有→必被过滤）；按输入文本语言补英文（中文为主，英文占比高则多补，可用 `language_hint` 强制）。
-> `section_hints`：默认 **6 个**（`section_count` 可配），预测最可能出现的合同章节名。
-> `semantic_queries`：默认 **3 句**（`query_count` 可配），自然语言定义（"这个条款指什么"），用于向量语义匹配召回。
-> `positive_examples`：从 `positive_candidates` 挑**差异最大**的 3-5 条，禁止编造/近义重复（PoC 用 LLM 判断；正式工具升级为 去重 + embedding/MMR）。
+- `positive_keywords`：默认 **10**（`keyword_count` 可配），**短词/短语、严禁整句**（精确匹配用，整句必被过滤）；按文本语言补英文（中文为主，可用 `language_hint` 强制）。
+- `section_hints`：默认 **6**（`section_count` 可配），预测章节名。
+- `semantic_queries`：默认 **3**（`query_count` 可配），自然语言定义，用于向量语义匹配。
+- `positive_examples`：从 `positive_candidates` 挑差异最大的 3-5 条，禁止编造（PoC 用 LLM 判断；正式工具升级为 去重+embedding/MMR）。
 
-### Stage 2
+**Stage 2**
 ```json
-{
-  "semantic_definition": "...",
-  "extraction_rules": {
-    "absolute_interception_rules": [{"rule","fixes"}],
-    "core_match_rules": [{"rule","fixes"}]
-  },
-  "self_consistency_check / coverage_check": "..."
-}
+{"semantic_definition","extraction_rules":{"absolute_interception_rules":[{"rule","fixes"}],"core_match_rules":[{"rule","fixes"}]},"self_consistency_check/coverage_check"}
 ```
 
-### 最终 BOM（配进平台）= `clause` + `semantic_definition` + `recall_profile` + `extraction_rules`（optimize 另含 `diagnosis`）
+**最终 BOM**（配进平台）= `clause` + `semantic_definition` + `recall_profile` + `extraction_rules`（optimize 另含 `diagnosis`）
 
 ## 手工闭环（准确率 = 真实平台金标准）
 
@@ -67,6 +85,6 @@ python quick_poc/rule_pipeline.py quick_poc/data/sample_slice.yaml --mode optimi
 
 - `LLM_API_KEY`：你的 key
 - `LLM_BASE_URL`：**留空 = 默认端点**；接 Gemini/自建/代理填对应地址
-- `LLM_MODEL`：模型名（gpt-4o-mini / gemini-2.5-flash / 自建模型名）
+- `LLM_MODEL`：模型名
 
-> 单步法版本见 `../poc/`；本目录是两步法、双场景增强版。
+> 单步法版本见 `../poc/`；本目录是两步法、双场景、提示词外置增强版。

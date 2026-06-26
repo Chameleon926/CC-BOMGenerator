@@ -1,0 +1,18 @@
+【阶段 1：诊断与召回画像】
+【目标条款】{{clause}}
+【当前语义定义与抽取规则（旧 BOM）】
+{{current_bom}}
+【候选正例（来自测试集期望值）】
+{{cands}}
+【测试集 Badcase 列表（含 Trace，如有）】
+{{badcases}}
+
+任务：
+1) 逐一归因每个 Badcase，【优先依据其 Trace】判定类别：原文窗口判断"召回问题"、reasoning 判断"大模型推理问题"、提示词输入输出判断"Prompt模板待优化"、规则本身判断"BOM问题"、多因并存判断"混合问题"。若该 Badcase 无 Trace，则只能确定误抽/漏抽，类别作低置信猜测。
+2) {{recall_rules}}
+
+只输出如下 JSON：
+{
+  "diagnosis": [{"case_id":"样本1","case_type":"miss|false_positive","category":"召回问题|混合问题|BOM问题|Prompt模板待优化|大模型推理问题","reason":"..."}],
+  "recall_profile": {"positive_keywords":[],"confusion_words":[],"section_hints":[],"semantic_queries":[],"positive_examples":[]}
+}

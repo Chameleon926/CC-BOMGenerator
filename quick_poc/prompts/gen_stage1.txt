@@ -1,0 +1,13 @@
+【阶段 1：召回画像生成（初始生成，尚无 Badcase）】
+【目标条款】{{clause}}
+【已有定义/规则（种子，可简略）】
+{{current_bom}}
+【候选正例（来自测试集期望值）】
+{{cands}}
+
+任务：{{recall_rules}}
+
+只输出如下 JSON：
+{
+  "recall_profile": {"positive_keywords":[],"confusion_words":[],"section_hints":[],"semantic_queries":[],"positive_examples":[]}
+}
