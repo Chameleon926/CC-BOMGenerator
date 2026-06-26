@@ -84,7 +84,8 @@ CC-BOMGenerator/
 - **前端**：Streamlit
 - **脱敏**：Presidio（本地 NER，假名化）
 - **外部 LLM**：google-generativeai（Gemini），API 直连为主 + 手动兜底
-- **本地 BOM 库**：SQLite + JSON（版本化）
+- **数据库**：MySQL（本地，utf8mb4）；BOM 等嵌套结构用 MySQL JSON 列存储；**SQLAlchemy ORM + Alembic 迁移**管 schema（变更提交到 git，各自 `alembic upgrade head` 同步；数据各人本地、不入库）
+- **DB 驱动**：PyMySQL
 - **契约**：Pydantic v2
 - **测试**：pytest
 - **IDE**：PyCharm（`.idea/` 已 gitignore）
