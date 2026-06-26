@@ -50,3 +50,4 @@ data/private/
 
 # ===== PoC 生成物（每次运行的输出，不入库）=====
 poc/output/
+quick_poc/output/
