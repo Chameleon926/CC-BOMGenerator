@@ -29,6 +29,32 @@ python quick_poc/rule_pipeline.py 你的条款.yaml --mode optimize
 
 输出：终端打印两阶段 JSON + 最终 BOM；存档到 `output/new_bom_<mode>_<时间>.json`。
 
+## 从 Excel/CSV 批量导入（推荐，免手填）
+
+测试集是 Excel/CSV 时，一键转成 yaml（一个条款一个文件），再批量跑：
+
+```bash
+python quick_poc/import_excel.py 你的测试集.xlsx         # 或 .csv
+# → 生成 quick_poc/data/imported/<条款>.yaml（每条款一个）
+python quick_poc/rule_pipeline.py quick_poc/data/imported/   # 批量跑全部
+```
+
+**列名自动识别**（中/英、大小写空格无关）：
+
+| 字段 | 英文列名 | 中文列名 | 必需 |
+|---|---|---|---|
+| 期望值 | `expected_value` | 期望值 / 期望结果 | ✅ |
+| 语义块编码 | `block_code` | 语义块编码 | 二选一 |
+| 语义块名称 | `block_name` | 语义块名称 / 条款名称 | 二选一 |
+| 文档ID | `doc_id` | 文档ID / 文档编号 | |
+| 文档名称 | `doc_name` | 文档名称 | |
+| 抽取值 | `actual_value` | 抽取值 / 实际值 | 可选 |
+| 合同原文 | `text` | 合同原文 / 原文 | 可选 |
+
+- **只有期望值** → 生成 `generate` yaml（场景①初始生成）。
+- **有抽取值** → 自动识别 badcase（期望≠抽取：误抽/漏抽），生成 `optimize` yaml（场景②）。
+- 生成的 yaml 自带 `mode` 字段，批量跑自动用对场景；trace 仍可手动补进 badcase。
+
 ## 两个场景
 
 | 场景 | `--mode` | 输入 | 要 Trace？ |

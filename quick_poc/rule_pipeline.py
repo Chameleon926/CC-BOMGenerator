@@ -146,30 +146,44 @@ def run_pipeline(client, data, mode):
     return final
 
 
+def run_one(client, data_path, mode_override):
+    """跑单个 yaml：mode 优先用命令行覆盖，其次 yaml 内 mode 字段，再缺省 optimize。"""
+    data = yaml.safe_load(data_path.read_text(encoding="utf-8"))
+    mode = mode_override or data.get("mode") or "optimize"
+    print(f"→ {data_path.name} | 模型 {MODEL} | base_url: {BASE_URL or '(默认)'} | 场景: {mode}\n")
+    final = run_pipeline(client, data, mode)
+    print("\n=== 最终 BOM ===")
+    print(json.dumps(final, ensure_ascii=False, indent=2))
+    out_dir = Path(__file__).parent / "output"
+    out_dir.mkdir(exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_name = re.sub(r"[^\w一-龥]+", "_", data_path.stem).strip("_") or "bom"
+    out_file = out_dir / f"{safe_name}_{mode}_{stamp}.json"
+    out_file.write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n✓ 已存档：{out_file}（拿去手工录入新/旧平台跑准确率）\n")
+
+
 def main():
     if not API_KEY:
         sys.exit("✗ 未读到 LLM_API_KEY，请先 cp .env.example .env 并填入。")
 
-    p = argparse.ArgumentParser(description="规则编排智能体 PoC（generate 初始生成 / optimize 已跑优化）")
-    p.add_argument("data", nargs="?", default=str(Path(__file__).parent / "data" / "sample_slice.yaml"))
-    p.add_argument("--mode", choices=["generate", "optimize"], default="optimize",
-                   help="generate=初始生成(无Badcase)；optimize=已跑优化(吃Badcase+Trace诊断)")
+    p = argparse.ArgumentParser(description="规则编排智能体 PoC（generate/optimize；支持单文件或目录批量）")
+    p.add_argument("data", nargs="?", default=str(Path(__file__).parent / "data" / "sample_slice.yaml"),
+                   help="yaml 文件，或目录（批量跑其中所有 *.yaml）")
+    p.add_argument("--mode", choices=["generate", "optimize"], default=None,
+                   help="覆盖 yaml 内的 mode；不填则用 yaml 的 mode 字段，再缺省 optimize")
     args = p.parse_args()
 
-    data = yaml.safe_load(Path(args.data).read_text(encoding="utf-8"))
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
-    print(f"→ 模型 {MODEL} | base_url: {BASE_URL or '(默认)'} | 场景: {args.mode}\n")
-
-    final = run_pipeline(client, data, args.mode)
-    print("\n=== 最终 BOM ===")
-    print(json.dumps(final, ensure_ascii=False, indent=2))
-
-    out_dir = Path(__file__).parent / "output"
-    out_dir.mkdir(exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_file = out_dir / f"new_bom_{args.mode}_{stamp}.json"
-    out_file.write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n✓ 已存档：{out_file}（拿去手工录入新/旧平台跑准确率）")
+    target = Path(args.data)
+    if target.is_dir():
+        yamls = sorted(target.glob("*.yaml"))
+        print(f"========== 批量模式：{len(yamls)} 个 yaml ==========\n")
+        for y in yamls:
+            print(f"##### {y.name} #####")
+            run_one(client, y, args.mode)
+    else:
+        run_one(client, target, args.mode)
 
 
 if __name__ == "__main__":

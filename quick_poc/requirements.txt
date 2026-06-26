@@ -1,3 +1,5 @@
 openai>=1.0          # OpenAI 兼容客户端（base_url 留空=默认端点，可接任意兼容端点）
 python-dotenv>=1.0   # 读取 .env 的 api-key / base_url / model
-pyyaml>=6.0          # 读取黄金切片 yaml
+pyyaml>=6.0          # 读取/写出 yaml
+pandas>=2.0          # 读 Excel/CSV 测试集（import_excel.py）
+openpyxl>=3.1        # pandas 读 xlsx 的引擎
