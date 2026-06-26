@@ -1,0 +1,3 @@
+openai>=1.0          # OpenAI 兼容客户端，可接 Gemini/自建/代理等任意兼容端点
+python-dotenv>=1.0   # 读取 .env 中的 api-key / base_url / model
+pyyaml>=6.0          # 读取黄金切片 yaml

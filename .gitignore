@@ -47,3 +47,6 @@ data/raw/
 data/sensitive/
 data/private/
 # 如需共享脱敏后的样例，放在 data/samples/（默认不忽略）
+
+# ===== PoC 生成物（每次运行的输出，不入库）=====
+poc/output/
