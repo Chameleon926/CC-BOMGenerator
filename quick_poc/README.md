@@ -32,6 +32,7 @@ python quick_poc/rule_pipeline.py quick_poc/data/sample_slice.yaml
   "recall_profile": {"positive_keywords","confusion_words","section_hints","semantic_queries","positive_examples"}
 }
 ```
+> `positive_examples`：从 yaml 的 `positive_candidates`（测试集期望值）中挑选**互相差异最大**的 3-5 条，禁止编造、禁止挑近义重复。（PoC 用 LLM 判断；正式工具升级为 去重 + embedding/MMR。）
 
 ### Stage 2（定义 + 抽取规则）
 ```json

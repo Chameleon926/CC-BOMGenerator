@@ -71,16 +71,20 @@ def fmt_badcases(cases):
 
 
 def stage1_user(d):
+    cands = d.get("positive_candidates", []) or []
+    cand_block = "\n".join(f"  ({i}) {c}" for i, c in enumerate(cands, 1)) if cands else "  （未提供候选）"
     return f"""【阶段 1：诊断与召回画像】
 【目标条款】{d.get('clause', '')}
 【当前语义定义与抽取规则（旧 BOM）】
 {d.get('current_bom', '')}
+【候选正例（来自测试集期望值）】
+{cand_block}
 【测试集 Badcase 列表】
 {fmt_badcases(d.get('badcases', []))}
 
 任务：
 1) 逐一归因每个 Badcase：漏抽/误抽分别是因为召回失败（缺关键词）、被规则误杀、缺易混淆词隔离，还是拦截不严？
-2) 重构召回画像。
+2) 重构召回画像。其中 positive_examples **必须从上方【候选正例】中挑选 3-5 条互相差异最大的代表性样例**（覆盖不同表述/场景；禁止编造、禁止挑选意思近似的重复条目）。
 
 只输出如下 JSON（字段不可少，数组可为空）：
 {{
