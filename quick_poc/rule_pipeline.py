@@ -4,11 +4,10 @@
 quick_poc · 规则编排智能体（两个场景）
 ================================================================
 场景① 初始生成 (generate)：名称 + 定义/规则(种子) + 测试集期望值，【无 Badcase/Trace】
-      → 直接生成首版 BOM（召回画像 → 定义+规则）。
 场景② 已跑优化 (optimize)：当前 BOM + Badcase(期望/抽取) + 准确率 + Trace(多样)
-      → 诊断(5类归因，依赖 Trace) → 优化（召回画像 → 定义+规则）。
 
 两场景都走"两步法"：召回画像(发散) → 抽取规则(收敛)，同一对话上下文连贯。
+召回画像数量/语言可在数据 yaml 配置（keyword_count/section_count/query_count/language_hint）。
 抽取与准确率交给真实新/旧平台手工跑（金标准）。模型配置见根目录 .env。
 ================================================================
 """
@@ -39,7 +38,6 @@ SYS = (
 
 
 def parse_json(raw: str) -> dict:
-    """容错解析：去代码块围栏、截取首个 {...}。"""
     s = re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.M).strip()
     i, j = s.find("{"), s.rfind("}")
     if i >= 0 and j > i:
@@ -48,10 +46,7 @@ def parse_json(raw: str) -> dict:
 
 
 def call(client, messages):
-    """调用大模型并解析为 JSON；失败则追加一次强约束重试。"""
-    raw = client.chat.completions.create(
-        model=MODEL, messages=messages, temperature=0.3,
-    ).choices[0].message.content
+    raw = client.chat.completions.create(model=MODEL, messages=messages, temperature=0.3).choices[0].message.content
     try:
         return parse_json(raw), raw
     except Exception:
@@ -74,6 +69,22 @@ def fmt_cands(cands):
     return "\n".join(f"  ({i}) {c}" for i, c in enumerate(cands, 1)) if cands else "  （未提供候选）"
 
 
+def recall_instr(d):
+    """召回画像生成规则（数量/语言可配，两场景共用）。"""
+    nkw = d.get("keyword_count", 10)
+    nsec = d.get("section_count", 6)
+    nq = d.get("query_count", 3)
+    hint = str(d.get("language_hint", "") or "").strip()
+    lang = (f"语言要求：{hint}。" if hint
+            else "中文为主；若输入文本含英文（尤其英文占比高），按比例补充英文短词。")
+    return f"""重构召回画像，严格遵守：
+- positive_keywords：恰好 {nkw} 个。必须是【短词/短语】（如"违约金""滞纳金""逾期付款"），【严禁整句】——它用于精确匹配章节片段，原文不会有整句、整句必被过滤。{lang}
+- confusion_words：导致误抽的高频干扰短词。
+- section_hints：恰好 {nsec} 个，预测该条款最可能出现的【合同章节名】（如"违约责任""付款条款"）。
+- semantic_queries：{nq} 句【自然语言定义/描述】（说明这个条款指什么，如"指向供应商支付款项时的支持性文件……"），用于向量语义匹配召回。
+- positive_examples：从【候选正例】中挑选 3-5 条互相差异最大的（禁止编造、禁止挑近义重复）。"""
+
+
 # ===================== 场景②：优化（吃 Badcase，含诊断）=====================
 def opt_stage1_user(d):
     return f"""【阶段 1：诊断与召回画像】
@@ -87,7 +98,7 @@ def opt_stage1_user(d):
 
 任务：
 1) 逐一归因每个 Badcase：漏抽/误抽分别是因为召回失败（缺关键词）、被规则误杀、缺易混淆词隔离，还是拦截不严？
-2) 重构召回画像。positive_examples **必须从【候选正例】中挑选 3-5 条互相差异最大的**（禁止编造、禁止挑近义重复）。
+2) {recall_instr(d)}
 
 只输出如下 JSON：
 {{
@@ -120,9 +131,7 @@ def gen_stage1_user(d):
 【候选正例（来自测试集期望值）】
 {fmt_cands(d.get('positive_candidates'))}
 
-任务：构建该条款的召回画像。
-- positive_examples **必须从【候选正例】中挑选 3-5 条互相差异最大的**（禁止编造、禁止挑近义重复）。
-- positive_keywords / confusion_words / section_hints / semantic_queries 基于条款含义与候选推断。
+任务：{recall_instr(d)}
 
 只输出如下 JSON：
 {{
@@ -156,7 +165,7 @@ def run_pipeline(client, data, mode):
     print(f"=== [{mode}] Stage 1：召回画像{'生成' if mode == 'generate' else ' + 诊断'} ===")
     msgs.append({"role": "user", "content": s1_user(data)})
     s1, raw1 = call(client, msgs)
-    msgs.append({"role": "assistant", "content": raw1})   # 纳入上下文供 Stage 2 续用
+    msgs.append({"role": "assistant", "content": raw1})
     print(json.dumps(s1, ensure_ascii=False, indent=2))
 
     print(f"\n=== [{mode}] Stage 2：定义 + 抽取规则 ===")
@@ -172,7 +181,7 @@ def run_pipeline(client, data, mode):
         "extraction_rules": s2.get("extraction_rules", {}),
     }
     if mode == "optimize":
-        final["diagnosis"] = s1.get("diagnosis", [])   # 仅优化场景有诊断
+        final["diagnosis"] = s1.get("diagnosis", [])
     return final
 
 

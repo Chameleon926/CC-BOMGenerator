@@ -38,8 +38,10 @@ python quick_poc/rule_pipeline.py quick_poc/data/sample_slice.yaml --mode optimi
 "diagnosis": [{"case_id","case_type":"miss|false_positive","category":"5类之一","reason"}]
 "recall_profile": {"positive_keywords","confusion_words","section_hints","semantic_queries","positive_examples"}
 ```
-> `positive_examples`：从 `positive_candidates`（测试集期望值）挑**差异最大**的 3-5 条，禁止编造/近义重复。
-> （PoC 用 LLM 判断；正式工具升级为 去重 + embedding/MMR。）
+> `positive_keywords`：默认 **10 个**（yaml `keyword_count` 可配），**必须短词/短语、严禁整句**（精确匹配章节片段用，整句原文没有→必被过滤）；按输入文本语言补英文（中文为主，英文占比高则多补，可用 `language_hint` 强制）。
+> `section_hints`：默认 **6 个**（`section_count` 可配），预测最可能出现的合同章节名。
+> `semantic_queries`：默认 **3 句**（`query_count` 可配），自然语言定义（"这个条款指什么"），用于向量语义匹配召回。
+> `positive_examples`：从 `positive_candidates` 挑**差异最大**的 3-5 条，禁止编造/近义重复（PoC 用 LLM 判断；正式工具升级为 去重 + embedding/MMR）。
 
 ### Stage 2
 ```json
