@@ -18,7 +18,10 @@
    - **改契约 = 开 PR 让对方 review**。契约变更属于「高影响变更」，必须显式同步，不能默默改。
 
 3. **分支 + PR 工作流**
-   - 每个功能开 feature 分支（`feat/<node>-<topic>`），不直接推 `main`。
+   - `main` = 集成分支（已评审通过的稳定内容），**不直接推**。
+   - 个人分支：`feature_lindayu`、`feature_yangli` —— 各自在自己分支开发。
+   - 流程：个人分支 → 开 PR → 对方 review → 合入 `main`。
+   - 复杂功能可在个人分支下再开短命分支（`feat/<node>-<topic>`），完成后合回个人分支。
    - 合并前用 `/code-review` 自审，复杂改动用 `superpowers:requesting-code-review` 互审。
    - 小步提交，逻辑单元完成即 commit + push。
 
