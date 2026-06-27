@@ -35,6 +35,8 @@ COL_MAP = {
     "block_name": ["block_name", "语义块名称", "语义块名", "条款名称", "条款名"],
     "expected_value": ["expected_value", "期望值", "期望结果", "期望"],
     "actual_value": ["actual_value", "抽取值", "实际值", "实际结果", "抽取结果", "actual"],
+    "match": ["是否匹配", "match", "匹配", "命中", "是否命中"],
+    "similarity": ["相似度", "similarity", "相似", "覆盖率", "coverage"],
     "text": ["text", "合同原文", "原文", "doc_text", "片段", "content"],
 }
 
@@ -84,10 +86,17 @@ def main():
         sys.exit("✗ 找不到【语义块】列（block_name / block_code / 语义块名称）")
 
     has_actual = bool(cols["actual_value"])
+    has_match = bool(cols["match"])
     key_col = cols["block_code"] or cols["block_name"]
-    mode = "optimize" if has_actual else "generate"
+    mode = "optimize" if (has_actual or has_match) else "generate"
     print(f"输入: {src.name} | 行数: {len(df)} | 场景: {mode}"
-          f"（{'含抽取值→优化' if has_actual else '仅期望值→初始生成'}）\n")
+          f"（{'含抽取值/是否匹配→优化' if (has_actual or has_match) else '仅期望值→初始生成'}）\n")
+
+    def _is_bad(r):
+        # 优先用平台的「是否匹配」判定（覆盖率结论，比 expected≠actual 可靠：近似匹配也算「是」）
+        if has_match:
+            return str(r[cols["match"]]).strip().lower() in ("否", "no", "false", "0", "f", "未匹配", "不匹配")
+        return str(r[cols["expected_value"]]).strip() != str(r[cols["actual_value"]]).strip()
 
     n = 0
     for key, g in df.groupby(key_col):
@@ -98,6 +107,7 @@ def main():
         data = {
             "mode": mode,
             "clause": str(name),
+            "block_code": str(code),
             "current_bom": f"（由 {src.name} 导入；block_code={code}；尚无既有规则）",
             "positive_candidates": expected,
             "keyword_count": 10,
@@ -106,17 +116,22 @@ def main():
         }
 
         bad_n = 0
-        if has_actual:
+        if mode == "optimize":
             bads = []
             for i, (_, r) in enumerate(g.iterrows()):
+                if not _is_bad(r):
+                    continue  # 抽对了（是否匹配=是），跳过
                 exp = str(r[cols["expected_value"]]).strip()
-                act = str(r[cols["actual_value"]]).strip()
-                if exp == act:
-                    continue  # 抽对了，跳过
+                act = str(r[cols["actual_value"]]).strip() if has_actual else ""
                 btype = "false_positive" if (not exp and act) else "miss"
                 txt = str(r[cols["text"]]).strip() if cols["text"] else (exp or act)
                 did = str(r[cols["doc_id"]]).strip() if cols["doc_id"] else "doc"
-                bads.append({"id": f"{did}_{i}", "type": btype, "expected": exp, "actual": act, "text": txt})
+                bc = {"id": f"{did}_{i}", "type": btype, "expected": exp, "actual": act, "text": txt}
+                if cols["similarity"]:
+                    sim = str(r[cols["similarity"]]).strip()
+                    if sim:
+                        bc["similarity"] = sim
+                bads.append(bc)
             data["badcases"] = bads
             bad_n = len(bads)
 

@@ -1,0 +1,11 @@
+{
+  "status": "extracted",
+  "blockExtractionResults": [
+    {
+      "blockCode": "FSB0000004",
+      "blockText": "|里程碑|付款百分比|付款金额|付款条件| |报告验收通过|100%|同发票金额|报告通过甲方验收|",
+      "llmConfidence": 0.9,
+      "reasoning": "按边界原则剔除了付款日/结算周期表述（COD每周四集中支付），仅保留里程碑表。"
+    }
+  ]
+}

@@ -67,6 +67,22 @@ python quick_poc/rule_pipeline.py quick_poc/data/imported/   # 批量跑全部
 
 两场景都走**两步法**：召回画像(发散) → 抽取规则(收敛)，同一对话上下文连贯。
 
+## Trace 诊断（场景② 增强）
+
+覆盖率型漏抽（阈值固定 80% 调不了）必须靠 trace 才能定位"是哪条规则害的"。Trace 支持 **txt** 读取：
+
+- **输入/输出两文件**（新平台 trace 本就分开）：badcase 里写 `trace_input: xxx_input.txt` + `trace_output: xxx_output.txt`
+- **或合并文件**（含"输入:"/"输出:" 标记）：`trace: xxx.txt`
+- 路径相对 yaml 所在目录。
+
+解析器自动抽出关键字段喂诊断：**当前规则/画像、合同原文窗口、模型抽取+reasoning、可用 chunks**。
+诊断做**覆盖率缺口 + 边界规则冲突**分析（例：期望含付款排程，但规则要求剔除付款日 → 冲突 → 放宽该剔除规则，让模型把期望完整 span 抽出来达标）。
+
+**格式错误会精确报位置**，例如：
+`[xxx_input.txt（输入）] 第 4 行 第 1 列 JSON 解析失败：Expecting value | 附近内容：行3/行4`
+
+> trace 为新平台导出的 JSON：输入含 `normalizedTarget`/`_fallback_chunks`/`perWindowPrompts`，输出含 `blockExtractionResults`。粘到 .txt 即可，带不带"输入:/输出:"标记都行。
+
 ## 提示词管理
 
 **提示词与代码分离**：所有 prompt 在 `prompts/`（纯文本 + `{{var}}` 占位），代码只加载渲染，不在代码里硬编码。
