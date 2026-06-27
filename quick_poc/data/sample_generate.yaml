@@ -10,6 +10,7 @@ keyword_count: 10
 section_count: 6
 query_count: 3
 # language_hint: "中英混合"   # 可选：强制语言策略
+# dedup_threshold: 0.8   # 候选近义去重阈值（>=此相似度视为重复；PoC 用 difflib）
 
 # 初始生成：可能只有条款名 + 最简种子定义，没有既有规则
 current_bom: |

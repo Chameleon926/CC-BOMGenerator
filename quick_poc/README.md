@@ -67,6 +67,21 @@ python quick_poc/rule_pipeline.py quick_poc/data/imported/   # 批量跑全部
 
 两场景都走**两步法**：召回画像(发散) → 抽取规则(收敛)，同一对话上下文连贯。
 
+## 去重 & 手动跑（省 token / 无需 API）
+
+**组装前自动近义去重**：候选期望值里 49/50 高度相似时，先用 `difflib` 字符相似度贪心去重（默认阈值 `0.8`，yaml 里 `dedup_threshold` 可调），防 prompt 过长/爆 token、防重复淹没模型。去重会打印 `候选去重：50 → 3`。
+> 正式工具升级为 embedding + MMR（更准，Phase 2 向量库）。
+
+**`--print-prompt` 手动模式**（不想配 API / 想用外网模型）：
+```bash
+python quick_poc/rule_pipeline.py 你的条款.yaml --mode optimize --print-prompt
+```
+直接渲染并打印 **Stage1 + Stage2 两段提示词**（存到 `output/<名>_prompts.txt`），**不调 API**：
+1. 复制 Stage1 提示词 → 粘到外网模型（Gemini/Claude/ChatGPT）→ 拿回 JSON；
+2. 把 JSON 粘到 Stage2 提示词的 `<<<>>>` 占位处 → 再发给模型 → 拿到最终 BOM。
+
+此模式**无需 `config/llm.yaml`、也不用装 openai**（懒加载）。
+
 ## Trace 诊断（场景② 增强）
 
 覆盖率型漏抽（阈值固定 80% 调不了）必须靠 trace 才能定位"是哪条规则害的"。Trace 支持 **txt** 读取：
