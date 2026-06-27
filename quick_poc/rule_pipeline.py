@@ -32,7 +32,7 @@ load_dotenv(ROOT / ".env")
 
 API_KEY = os.getenv("LLM_API_KEY")
 BASE_URL = os.getenv("LLM_BASE_URL") or None          # 留空 → 用 SDK 默认端点
-MODEL = os.getenv("LLM_MODEL") or "gpt-4o-mini"
+MODEL = os.getenv("LLM_MODEL")                        # 无默认值，必须由 .env 提供
 
 
 def load_prompt(name):
@@ -201,8 +201,10 @@ def run_one(client, data_path, mode_override):
 
 
 def main():
-    if not API_KEY:
-        sys.exit("✗ 未读到 LLM_API_KEY，请先 cp .env.example .env 并填入。")
+    missing = [n for n, v in (("LLM_API_KEY", API_KEY), ("LLM_MODEL", MODEL)) if not v]
+    if missing:
+        sys.exit("✗ 未读到模型配置：" + "、".join(missing) + "。请 cp .env.example .env 并填写"
+                 "（LLM_BASE_URL 可留空走默认端点）。")
 
     p = argparse.ArgumentParser(description="规则编排智能体 PoC（generate/optimize；支持单文件或目录批量）")
     p.add_argument("data", nargs="?", default=str(Path(__file__).parent / "data" / "sample_slice.yaml"),
