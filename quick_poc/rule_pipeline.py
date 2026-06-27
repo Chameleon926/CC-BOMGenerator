@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-quick_poc · 规则编排智能体（两个场景）
+quick_poc · 规则编排智能体（两阶段，与平台逻辑对齐：定义+规则 → 召回画像）
 ================================================================
-场景① 初始生成 (generate)：名称 + 定义/规则(种子) + 测试集期望值，【无 Badcase/Trace】
-场景② 已跑优化 (optimize)：当前 BOM + Badcase(期望/抽取) + Trace(输入/输出)
+场景① generate：名称 + 种子 + 期望值（无 Badcase）→ 首版 BOM
+场景② optimize：当前 BOM + Badcase(期望/抽取) + Trace → 优化 BOM + 诊断
 
-两步法：召回画像(发散) → 抽取规则(收敛)。
-- 组装前对候选期望值【近义去重】（控 token、防重复淹没）。
-- 两种用法：
-    默认         → 直接调 config/llm.yaml 配置的模型
-    --print-prompt → 只渲染+打印两段提示词（不调 API），copy 到外网模型
-提示词在 prompts/，模型配置在 config/llm.yaml。
+两阶段（翻转后，匹配平台"先定义规则、再派生画像"）：
+  Stage 1：语义定义 + 抽取规则（optimize 另含 diagnosis[fix_target]）   [收敛，低温]
+  Stage 2：召回画像（从 Stage 1 派生）                                   [发散，中温]
+- 提示词结构化(XML标签)+各阶段独立角色，在 prompts/。
+- positive_keywords 生成后程序化过滤（去数字/超长/整句，防过拟合）。
+- 默认只生成提示词（PoC）；--api 调模型；--combine 合并两段返回为可读 BOM。
 ================================================================
 """
 import argparse
@@ -33,15 +33,16 @@ CFG_PATH = ROOT / "config" / "llm.yaml"
 
 def _load_llm_config():
     if not CFG_PATH.exists():
-        return {}   # print-prompt 模式不需要配置；API 模式会在 main 里检查并提示
+        return {}
     return yaml.safe_load(CFG_PATH.read_text(encoding="utf-8")) or {}
 
 
 _CFG = _load_llm_config()
 API_KEY = str(_CFG.get("api_key") or "").strip()
-BASE_URL = str(_CFG.get("base_url") or "").strip() or None   # 留空 → 用 SDK 默认端点
+BASE_URL = str(_CFG.get("base_url") or "").strip() or None
 MODEL = str(_CFG.get("model") or "").strip()
-TEMPERATURE = float(_CFG.get("temperature", 0.3))
+TEMP_S1 = float(_CFG.get("temperature_stage1", 0.2))   # Stage1 定义+规则：收敛低温
+TEMP_S2 = float(_CFG.get("temperature_stage2", 0.5))   # Stage2 召回画像：发散中温
 
 
 def load_prompt(name):
@@ -66,14 +67,14 @@ def parse_json(raw):
     return json.loads(s)
 
 
-def call(client, messages):
-    raw = client.chat.completions.create(model=MODEL, messages=messages, temperature=TEMPERATURE).choices[0].message.content
+def call(client, messages, temperature):
+    raw = client.chat.completions.create(model=MODEL, messages=messages, temperature=temperature).choices[0].message.content
     try:
         return parse_json(raw), raw
     except Exception:
         msgs = messages + [{"role": "user",
                             "content": "上一次输出无法解析为 JSON。请只返回一个合法 JSON 对象，不要任何额外文字。"}]
-        raw2 = client.chat.completions.create(model=MODEL, messages=msgs, temperature=max(0.0, TEMPERATURE - 0.1)).choices[0].message.content
+        raw2 = client.chat.completions.create(model=MODEL, messages=msgs, temperature=max(0.0, temperature - 0.1)).choices[0].message.content
         return parse_json(raw2), raw2
 
 
@@ -83,7 +84,6 @@ def fmt_cands(cands):
 
 
 _TRACE_FIELDS = [
-    # (短名, 显示名, 取值键, 截断长度)
     ("current_rules", "当前规则/画像", "current_rules_profile", 1200),
     ("context_window", "合同原文窗口", "context_window", 1500),
     ("model_extracted", "模型抽取", "model_extracted", 800),
@@ -93,7 +93,6 @@ ALL_TRACE_FIELDS = [f[0] for f in _TRACE_FIELDS] + ["chunks"]
 
 
 def fmt_badcases_rich(cases, fields=None):
-    """fields: 选中的 trace 字段短名列表；None=全部。trace 太长时只挑有效字段。"""
     sel = set(fields) if fields else set(ALL_TRACE_FIELDS)
     show_chunks = "chunks" in sel
     lines = []
@@ -135,13 +134,38 @@ def load_badcase_trace(c, base_dir):
     return extract_structured(inp, out) if (inp or out) else None
 
 
-def recall_rules(d):
+def recall_params(d):
     hint = str(d.get("language_hint", "") or "").strip()
     lang = (f"语言要求：{hint}。" if hint
             else "中文为主；若输入文本含英文（尤其英文占比高），按比例补充英文短词。")
-    return render(load_prompt("recall"),
-                  nkw=d.get("keyword_count", 10), nsec=d.get("section_count", 6),
-                  nq=d.get("query_count", 3), lang=lang)
+    return {"nkw": d.get("keyword_count", 10), "nsec": d.get("section_count", 6),
+            "nq": d.get("query_count", 3), "lang": lang}
+
+
+def sanitize_keywords(kws):
+    """过滤过拟合关键词：含数字/整句标点/超长的一律丢。"""
+    out, seen = [], set()
+    for kw in (kws or []):
+        s = str(kw).strip()
+        if not s or s in seen:
+            continue
+        cn = sum(1 for c in s if "一" <= c <= "鿿")
+        if re.search(r"\d", s):                       # 含数字/金额/百分比 → 过拟合
+            continue
+        if re.search(r"[，,；;。.!！？?]", s):         # 整句标点
+            continue
+        if cn > 8 or len(s) > 12:                     # 太长
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+
+# ===== Stage 1：语义定义 + 抽取规则（optimize 含诊断）=====
+def gen_stage1_user(d):
+    return render(load_prompt("gen_stage1"),
+                  clause=d.get("clause", ""), current_bom=d.get("current_bom", "（无）"),
+                  cands=fmt_cands(d.get("positive_candidates")))
 
 
 def opt_stage1_user(d):
@@ -149,23 +173,20 @@ def opt_stage1_user(d):
                   clause=d.get("clause", ""), block_code=d.get("block_code", ""),
                   current_bom=d.get("current_bom", ""),
                   cands=fmt_cands(d.get("positive_candidates")),
-                  badcases=fmt_badcases_rich(d.get("badcases", []), d.get("trace_fields")),
-                  recall_rules=recall_rules(d))
+                  badcases=fmt_badcases_rich(d.get("badcases", []), d.get("trace_fields")))
 
 
-def opt_stage2_user(s1):
-    return render(load_prompt("opt_stage2"), stage1_json=json.dumps(s1, ensure_ascii=False, indent=2))
+# ===== Stage 2：召回画像（从 Stage 1 派生）=====
+def gen_stage2_user(s1, d):
+    return render(load_prompt("gen_stage2"),
+                  stage1_json=json.dumps(s1, ensure_ascii=False, indent=2),
+                  cands=fmt_cands(d.get("positive_candidates")), **recall_params(d))
 
 
-def gen_stage1_user(d):
-    return render(load_prompt("gen_stage1"),
-                  clause=d.get("clause", ""), current_bom=d.get("current_bom", "（无）"),
-                  cands=fmt_cands(d.get("positive_candidates")),
-                  recall_rules=recall_rules(d))
-
-
-def gen_stage2_user(s1):
-    return render(load_prompt("gen_stage2"), stage1_json=json.dumps(s1, ensure_ascii=False, indent=2))
+def opt_stage2_user(s1, d):
+    return render(load_prompt("opt_stage2"),
+                  stage1_json=json.dumps(s1, ensure_ascii=False, indent=2),
+                  cands=fmt_cands(d.get("positive_candidates")), **recall_params(d))
 
 
 def run_pipeline(client, data, mode):
@@ -173,66 +194,35 @@ def run_pipeline(client, data, mode):
     s1_user = gen_stage1_user if mode == "generate" else opt_stage1_user
     s2_user = gen_stage2_user if mode == "generate" else opt_stage2_user
 
-    print(f"=== [{mode}] Stage 1：召回画像{'生成' if mode == 'generate' else ' + 诊断'} ===")
+    print(f"=== [{mode}] Stage 1：语义定义 + 抽取规则{'（+诊断）' if mode == 'optimize' else ''} ===")
     msgs.append({"role": "user", "content": s1_user(data)})
-    s1, raw1 = call(client, msgs)
+    s1, raw1 = call(client, msgs, TEMP_S1)
     msgs.append({"role": "assistant", "content": raw1})
     print(json.dumps(s1, ensure_ascii=False, indent=2))
 
-    print(f"\n=== [{mode}] Stage 2：定义 + 抽取规则 ===")
-    msgs.append({"role": "user", "content": s2_user(s1)})
-    s2, _ = call(client, msgs)
+    print(f"\n=== [{mode}] Stage 2：召回画像（派生自 Stage 1）===")
+    msgs.append({"role": "user", "content": s2_user(s1, data)})
+    s2, _ = call(client, msgs, TEMP_S2)
     print(json.dumps(s2, ensure_ascii=False, indent=2))
 
+    rp = s2.get("recall_profile", {}) or {}
+    before = rp.get("positive_keywords", []) or []
+    rp["positive_keywords"] = sanitize_keywords(before)
+    if len(rp["positive_keywords"]) < len(before):
+        print(f"  ℹ 关键词过滤：{len(before)} → {len(rp['positive_keywords'])}（去掉含数字/超长/整句的过拟合项）")
+
     final = {
-        "mode": mode,
-        "clause": data.get("clause", ""),
-        "block_code": data.get("block_code", ""),
-        "semantic_definition": s2.get("semantic_definition", ""),
-        "recall_profile": s1.get("recall_profile", {}),
-        "extraction_rules": s2.get("extraction_rules", {}),
+        "mode": mode, "clause": data.get("clause", ""), "block_code": data.get("block_code", ""),
+        "semantic_definition": s1.get("semantic_definition", ""),
+        "extraction_rules": s1.get("extraction_rules", {}),
+        "recall_profile": rp,
     }
     if mode == "optimize":
         final["diagnosis"] = s1.get("diagnosis", [])
     return final
 
 
-def print_prompts(data, mode, data_path):
-    """渲染并打印两段提示词（不调 API），方便 copy 到外网模型。"""
-    s1_user = gen_stage1_user if mode == "generate" else opt_stage1_user
-    s1 = s1_user(data)
-    s2 = render(load_prompt("gen_stage2" if mode == "generate" else "opt_stage2"),
-                stage1_json="\n<<< 把 Stage 1 返回的 JSON 粘贴到这里 >>>\n")
-    bar = "=" * 64
-    print(f"\n{bar}\n【Stage 1 提示词】复制到外网模型（Gemini/Claude/ChatGPT），拿回 JSON\n{bar}\n")
-    print(s1)
-    print(f"\n{bar}\n【Stage 2 提示词】先把 Stage 1 的 JSON 粘到 <<<>>> 处，再发给模型\n{bar}\n")
-    print(s2)
-    out_dir = Path(__file__).parent / "output"
-    out_dir.mkdir(exist_ok=True)
-    f = out_dir / f"{data_path.stem}_prompts.txt"
-    f.write_text(f"===== Stage 1 提示词 =====\n{s1}\n\n===== Stage 2 提示词 =====\n{s2}\n", encoding="utf-8")
-    print(f"\n✓ 两段提示词已存：{f}（方便整体复制）\n")
-
-
-def dedup_step(items, threshold=0.8):
-    """近义去重并打印"去掉了哪些/组装了多少进提示词"。"""
-    if not items:
-        return []
-    kept, dropped = near_dedup_report(items, threshold)
-    if dropped:
-        print(f"  ℹ 候选去重：{len(items)} 条 → 组装 {len(kept)} 条进提示词（去掉 {len(dropped)} 条近重复）")
-        for d, m in dropped[:3]:
-            print(f"     ✗ 去掉「{str(d)[:36]}…」（≈ 保留「{str(m)[:36]}…」）")
-        if len(dropped) > 3:
-            print(f"     …另有 {len(dropped) - 3} 条近重复被去掉")
-    else:
-        print(f"  ℹ 候选 {len(kept)} 条（无需去重），全部组装进提示词")
-    return kept
-
-
 def render_readable(bom):
-    """BOM JSON → 业务可读文本（定义 / 规则 / 召回画像 / 诊断）。"""
     L = [f"【条款】{bom.get('clause', '')}（{bom.get('block_code', '')}）\n",
          "【业务定义】", (bom.get("semantic_definition") or "（无）").strip() + "\n",
          "【抽取规则】", "🛑 绝对拦截规则（命中即放弃，针对误抽）："]
@@ -256,24 +246,27 @@ def render_readable(bom):
     if bom.get("diagnosis"):
         L.append("\n【Badcase 诊断】（仅 optimize）")
         for d in bom["diagnosis"]:
-            L += [f"- {d.get('case_id', '')}（{d.get('case_type', '')}）[{d.get('category', '')}]",
+            tgt = d.get("fix_target", "")
+            L += [f"- {d.get('case_id', '')}（{d.get('case_type', '')}）[{d.get('category', '')}]" + (f" →修{tgt}" if tgt else ""),
                   f"    根因：{d.get('reason', '')}",
                   f"    建议修法：{d.get('suggested_fix', '')}"]
     return "\n".join(L)
 
 
 def combine_and_render(paths, mode_override):
-    """把外网返回的 Stage1/Stage2 JSON 合并成最终 BOM，并渲染业务可读版。"""
+    """外网返回的 Stage1(定义+规则[+诊断]) + Stage2(召回画像) → 合并为最终 BOM 并渲染可读版。"""
     yaml_p, s1_p, s2_p = paths
     data = yaml.safe_load(Path(yaml_p).read_text(encoding="utf-8"))
     mode = mode_override or data.get("mode") or "optimize"
-    s1 = parse_json(Path(s1_p).read_text(encoding="utf-8"))   # 容错：去代码块围栏
-    s2 = parse_json(Path(s2_p).read_text(encoding="utf-8"))
+    s1 = parse_json(Path(s1_p).read_text(encoding="utf-8"))   # Stage1：定义+规则(+诊断)
+    s2 = parse_json(Path(s2_p).read_text(encoding="utf-8"))   # Stage2：召回画像
+    rp = s2.get("recall_profile", {}) or {}
+    rp["positive_keywords"] = sanitize_keywords(rp.get("positive_keywords"))
     final = {
         "mode": mode, "clause": data.get("clause", ""), "block_code": data.get("block_code", ""),
-        "semantic_definition": s2.get("semantic_definition", ""),
-        "recall_profile": s1.get("recall_profile", {}),
-        "extraction_rules": s2.get("extraction_rules", {}),
+        "semantic_definition": s1.get("semantic_definition", ""),
+        "extraction_rules": s1.get("extraction_rules", {}),
+        "recall_profile": rp,
     }
     if mode == "optimize":
         final["diagnosis"] = s1.get("diagnosis", [])
@@ -285,6 +278,40 @@ def combine_and_render(paths, mode_override):
     (out_dir / f"{stem}_BOM.json").write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
     (out_dir / f"{stem}_BOM_readable.md").write_text(render_readable(final), encoding="utf-8")
     print(f"\n✓ 已存：{out_dir / (stem + '_BOM.json')}（原始JSON）+ {stem}_BOM_readable.md（业务可读）")
+
+
+def dedup_step(items, threshold=0.8):
+    if not items:
+        return []
+    kept, dropped = near_dedup_report(items, threshold)
+    if dropped:
+        print(f"  ℹ 候选去重：{len(items)} 条 → 组装 {len(kept)} 条进提示词（去掉 {len(dropped)} 条近重复）")
+        for d, m in dropped[:3]:
+            print(f"     ✗ 去掉「{str(d)[:36]}…」（≈ 保留「{str(m)[:36]}…」）")
+        if len(dropped) > 3:
+            print(f"     …另有 {len(dropped) - 3} 条近重复被去掉")
+    else:
+        print(f"  ℹ 候选 {len(kept)} 条（无需去重），全部组装进提示词")
+    return kept
+
+
+def print_prompts(data, mode, data_path):
+    """渲染并打印两阶段提示词（不调 API）。"""
+    s1_user = gen_stage1_user if mode == "generate" else opt_stage1_user
+    s1 = s1_user(data)
+    s2 = render(load_prompt("gen_stage2" if mode == "generate" else "opt_stage2"),
+                stage1_json="\n<<< 把 Stage 1 返回的 JSON 粘贴到这里 >>>\n",
+                cands=fmt_cands(data.get("positive_candidates")), **recall_params(data))
+    bar = "=" * 64
+    print(f"\n{bar}\n【Stage 1 提示词：语义定义+抽取规则】复制到外网模型，拿回 JSON\n{bar}\n")
+    print(s1)
+    print(f"\n{bar}\n【Stage 2 提示词：召回画像】先把 Stage 1 的 JSON 粘到 <<<>>> 处，再发给模型\n{bar}\n")
+    print(s2)
+    out_dir = Path(__file__).parent / "output"
+    out_dir.mkdir(exist_ok=True)
+    f = out_dir / f"{data_path.stem}_prompts.txt"
+    f.write_text(f"===== Stage 1 提示词 =====\n{s1}\n\n===== Stage 2 提示词 =====\n{s2}\n", encoding="utf-8")
+    print(f"\n✓ 两段提示词已存：{f}（方便整体复制）\n")
 
 
 def run_one(client, data_path, mode_override, use_api):
@@ -303,7 +330,7 @@ def run_one(client, data_path, mode_override, use_api):
             print(f"\n✗ Trace 解析失败，已跳过 {data_path.name}：\n{e}\n")
             return
 
-    if not use_api:                       # PoC 默认：只生成提示词
+    if not use_api:
         print_prompts(data, mode, data_path)
         return
 
@@ -322,14 +349,13 @@ def run_one(client, data_path, mode_override, use_api):
 
 def main():
     p = argparse.ArgumentParser(
-        description="规则编排智能体 PoC（默认生成提示词去外网跑；--api 调模型；--combine 合并结果为可读BOM）")
+        description="规则编排智能体 PoC（阶段：定义+规则 → 召回画像；默认生成提示词；--api 调模型；--combine 合并结果）")
     p.add_argument("data", nargs="?", default=str(Path(__file__).parent / "data" / "sample_slice.yaml"),
                    help="yaml 文件，或目录（批量）")
-    p.add_argument("--mode", choices=["generate", "optimize"], default=None,
-                   help="覆盖 yaml 内的 mode；不填用 yaml 的 mode，再缺省 optimize")
+    p.add_argument("--mode", choices=["generate", "optimize"], default=None)
     p.add_argument("--api", action="store_true", help="调 config/llm.yaml 的模型（默认只生成提示词）")
     p.add_argument("--combine", nargs=3, metavar=("YAML", "STAGE1_JSON", "STAGE2_JSON"),
-                   help="把外网返回的两段 JSON 合并成业务可读 BOM")
+                   help="把外网返回的 Stage1/Stage2 JSON 合并成业务可读 BOM")
     args = p.parse_args()
 
     if args.combine:
@@ -345,7 +371,7 @@ def main():
         if missing:
             sys.exit("✗ config/llm.yaml 未填写：" + "、".join(missing) + "。PoC 默认只生成提示词（不加 --api）；"
                      "如要自动调模型请填 config/llm.yaml。")
-        from openai import OpenAI   # 懒加载：默认(出提示词)模式无需装 openai
+        from openai import OpenAI
         client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
     if len(files) > 1:

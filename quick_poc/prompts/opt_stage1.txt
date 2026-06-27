@@ -1,38 +1,38 @@
-【阶段 1：诊断与召回画像】（场景②：已跑优化）
-抽取工作流固定为：分段覆盖匹配，单段/整体覆盖率阈值均 80%（不可调）。
-"匹配"= 实际抽取覆盖期望 ≥80%。阈值锁死，**只能靠让模型抽得更完整/更准来达标**。
+<角色>你是一位资深合同语义架构师，擅长基于 Badcase 与 Trace 诊断并重写【语义定义 + 抽取规则】。</角色>
 
-【目标条款】{{clause}}（{{block_code}}）
-【当前语义定义与规则 + 画像（旧 BOM）】
-{{current_bom}}
-【候选正例（来自测试集期望值）】
-{{cands}}
-【测试集 Badcase 列表（含 Trace 证据）】
-{{badcases}}
+<背景>抽取工作流为分段覆盖匹配，整体/单段覆盖率阈值均 80%（不可调）。"匹配"= 实际抽取覆盖期望 ≥80%。阈值锁死，只能靠让模型抽得更完整/更准来达标。</背景>
 
-任务：
-1) 逐条诊断每个 Badcase，**优先用其 Trace 证据**判定根因与修法：
-   - 若 actual 非空但覆盖率不足（actual 没覆盖期望 ≥80%）→【抽取完整度/边界】问题：
-     · 找出"期望里有、但模型没抽出"的缺失段；
-     · 对照 Trace 的【当前规则/画像】，看是否有【剔除/否定规则】把这些段误删了
-       （典型：期望里含"付款排程/付款日"，但规则要求剔除付款日 → 自相矛盾）；
-       或【核心匹配规则】太窄没把缺失段纳入。
-     · 修法：放宽/修正哪条剔除规则、或扩充核心匹配规则，使模型把期望完整 span 抽出来。
-   - 若 actual 为空（漏抽）→ 看期望内容是否在 Trace 的【合同原文窗口】里：
-     · 不在 → 召回问题（修画像：章节提示/语义查询/关键词去召回对的 chunk）；
-     · 在但没抽 → BOM问题（放宽核心匹配规则 / 检查是否被否定规则误杀）。
-   - 若 Trace 的【模型 reasoning】显示规则都对、是模型自己理解错 → 大模型推理问题（补 few-shot，不动规则）。
-   归因落到 5 类之一：召回问题 / 混合问题 / BOM问题 / Prompt模板待优化 / 大模型推理问题。
-   无 Trace 的 Badcase 只能判误抽/漏抽，类别作低置信猜测。
-2) {{recall_rules}}
+<任务>这是第 1 阶段（共 2 阶段）。基于目标条款、当前定义+规则、候选正例、Badcase（含 Trace），先逐条【诊断】Badcase，再【重写】语义定义+抽取规则以修复所有 Badcase。召回画像在第 2 阶段派生。</任务>
 
-只输出如下 JSON：
+<约束>
+- 必须提炼泛化特征，严禁具体公司名/金额/百分比/人名/日期。
+- semantic_definition 写清【包含】与【不含(边界)】两段。
+- 诊断优先用 Trace 证据：原文窗口判"召回问题"、reasoning 判"大模型推理问题"、提示词输入输出判"Prompt模板待优化"、规则本身判"BOM问题"、多因并存判"混合问题"；无 Trace 则只能判误抽/漏抽、低置信猜类别。
+- 每条诊断给 fix_target：修规则填 rules、修画像填 recall_profile、两者都改填 both（recall_profile/both 的会在第 2 阶段落实）。
+</约束>
+
+<目标条款>{{clause}}（{{block_code}}）</目标条款>
+
+<当前定义与规则>{{current_bom}}</当前定义与规则>
+
+<候选正例>{{cands}}</候选正例>
+
+<Badcase 列表（含 Trace 证据）>{{badcases}}</Badcase 列表（含 Trace 证据）>
+
+<输出格式>只输出一个合法 JSON 对象：
 {
   "diagnosis": [
-    {"case_id":"样本1","case_type":"miss|false_positive",
-     "category":"召回问题|混合问题|BOM问题|Prompt模板待优化|大模型推理问题",
-     "reason":"根因分析（引用 Trace 证据）",
-     "suggested_fix":"具体修哪条规则/画像（如：放宽'剔除付款日'规则，因期望含付款排程）"}
+    {"case_id": "样本1", "case_type": "miss|false_positive",
+     "category": "召回问题|混合问题|BOM问题|Prompt模板待优化|大模型推理问题",
+     "reason": "根因分析（引用 Trace 证据）",
+     "suggested_fix": "具体修哪条规则/画像",
+     "fix_target": "rules|recall_profile|both"}
   ],
-  "recall_profile": {"positive_keywords":[],"confusion_words":[],"section_hints":[],"semantic_queries":[],"positive_examples":[]}
+  "semantic_definition": "【包含】...；【不含】...",
+  "extraction_rules": {
+    "absolute_interception_rules": [{"rule": "...", "fixes": "针对哪个误抽"}],
+    "core_match_rules": [{"rule": "...", "fixes": "针对哪个漏抽"}]
+  },
+  "coverage_check": "新定义+规则能否修复所有 Badcase、是否泛化"
 }
+</输出格式>
