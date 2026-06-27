@@ -17,7 +17,7 @@
 
 ```bash
 cd E:/Python_Project/CC-BOMGenerator
-cp .env.example .env                 # 填 LLM_API_KEY（url 留空=默认端点）
+cp config/llm.example.yaml config/llm.yaml   # 填 api_key / base_url / model
 pip install -r quick_poc/requirements.txt
 
 # 场景① 初始生成（无 badcase）
@@ -123,10 +123,17 @@ prompts/
 2. 用一批**没给大模型看过的**测试数据（hold-out）跑评测。
 3. 看指标：**漏抽减少 + 没引入新误抽（回归）** = 通过 ✅ → 进入正式开发。
 
-## 模型配置（根目录 `.env`，PoC 与正式工具共用）
+## 模型配置（`config/llm.yaml`，PoC 与正式工具共用）
 
-- `LLM_API_KEY`：你的 key
-- `LLM_BASE_URL`：**留空 = 默认端点**；接 Gemini/自建/代理填对应地址
-- `LLM_MODEL`：模型名
+复制模板填写（`llm.yaml` 已 gitignore，绝不入库；各自填各自的）：
+```bash
+cp config/llm.example.yaml config/llm.yaml
+```
+```yaml
+api_key: "sk-..."        # 必填
+base_url: ""             # 留空=默认端点；接 Gemini/自建/代理填地址
+model: "gpt-4o-mini"     # 必填
+temperature: 0.3         # 可选
+```
 
 > 本目录是规则编排智能体的 PoC（两步法、双场景、提示词外置、结构化 Trace 诊断）。

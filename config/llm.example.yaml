@@ -1,0 +1,17 @@
+# 大模型配置 —— 复制本文件为 llm.yaml 并填写你的值：
+#   cp config/llm.example.yaml config/llm.yaml
+# llm.yaml 已被 .gitignore 忽略（绝不入库）；每位开发者各自填写，互不可见。
+
+# API Key（必填）
+api_key: ""
+
+# 接口地址（OpenAI 兼容）。留空 = 用 SDK 默认端点；
+# 接 Gemini / 自建 / 代理则填对应地址，例：
+#   https://generativelanguage.googleapis.com/v1beta/openai
+base_url: ""
+
+# 模型名（必填），例：gpt-4o-mini / gemini-2.5-flash / 你自建模型名
+model: ""
+
+# 采样温度（可选，默认 0.3）
+temperature: 0.3

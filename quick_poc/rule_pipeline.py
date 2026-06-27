@@ -14,25 +14,32 @@ quick_poc · 规则编排智能体（两个场景）
 """
 import argparse
 import json
-import os
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
 import yaml
-from dotenv import load_dotenv
 from openai import OpenAI
 
 from trace_parser import TraceError, extract_structured, load_trace
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMPTS = Path(__file__).resolve().parent / "prompts"
-load_dotenv(ROOT / ".env")
+CFG_PATH = ROOT / "config" / "llm.yaml"
 
-API_KEY = os.getenv("LLM_API_KEY")
-BASE_URL = os.getenv("LLM_BASE_URL") or None          # 留空 → 用 SDK 默认端点
-MODEL = os.getenv("LLM_MODEL")                        # 无默认值，必须由 .env 提供
+
+def _load_llm_config():
+    if not CFG_PATH.exists():
+        sys.exit(f"✗ 找不到 {CFG_PATH}。请 cp config/llm.example.yaml config/llm.yaml 并填写。")
+    return yaml.safe_load(CFG_PATH.read_text(encoding="utf-8")) or {}
+
+
+_CFG = _load_llm_config()
+API_KEY = str(_CFG.get("api_key") or "").strip()
+BASE_URL = str(_CFG.get("base_url") or "").strip() or None   # 留空 → 用 SDK 默认端点
+MODEL = str(_CFG.get("model") or "").strip()                 # 必须由 config/llm.yaml 提供
+TEMPERATURE = float(_CFG.get("temperature", 0.3))
 
 
 def load_prompt(name):
@@ -58,13 +65,13 @@ def parse_json(raw):
 
 
 def call(client, messages):
-    raw = client.chat.completions.create(model=MODEL, messages=messages, temperature=0.3).choices[0].message.content
+    raw = client.chat.completions.create(model=MODEL, messages=messages, temperature=TEMPERATURE).choices[0].message.content
     try:
         return parse_json(raw), raw
     except Exception:
         msgs = messages + [{"role": "user",
                             "content": "上一次输出无法解析为 JSON。请只返回一个合法 JSON 对象，不要任何额外文字。"}]
-        raw2 = client.chat.completions.create(model=MODEL, messages=msgs, temperature=0.2).choices[0].message.content
+        raw2 = client.chat.completions.create(model=MODEL, messages=msgs, temperature=max(0.0, TEMPERATURE - 0.1)).choices[0].message.content
         return parse_json(raw2), raw2
 
 
@@ -201,10 +208,9 @@ def run_one(client, data_path, mode_override):
 
 
 def main():
-    missing = [n for n, v in (("LLM_API_KEY", API_KEY), ("LLM_MODEL", MODEL)) if not v]
+    missing = [n for n, v in (("api_key", API_KEY), ("model", MODEL)) if not v]
     if missing:
-        sys.exit("✗ 未读到模型配置：" + "、".join(missing) + "。请 cp .env.example .env 并填写"
-                 "（LLM_BASE_URL 可留空走默认端点）。")
+        sys.exit("✗ config/llm.yaml 未填写：" + "、".join(missing) + "。")
 
     p = argparse.ArgumentParser(description="规则编排智能体 PoC（generate/optimize；支持单文件或目录批量）")
     p.add_argument("data", nargs="?", default=str(Path(__file__).parent / "data" / "sample_slice.yaml"),
