@@ -23,7 +23,7 @@ from pathlib import Path
 
 import yaml
 
-from dedup import near_dedup
+from dedup import near_dedup, near_dedup_report
 from trace_parser import TraceError, extract_structured, load_trace
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -82,23 +82,39 @@ def fmt_cands(cands):
     return "\n".join(f"  ({i}) {c}" for i, c in enumerate(cands, 1)) if cands else "  （未提供候选）"
 
 
-def fmt_badcases_rich(cases):
+_TRACE_FIELDS = [
+    # (短名, 显示名, 取值键, 截断长度)
+    ("current_rules", "当前规则/画像", "current_rules_profile", 1200),
+    ("context_window", "合同原文窗口", "context_window", 1500),
+    ("model_extracted", "模型抽取", "model_extracted", 800),
+    ("reasoning", "模型 reasoning", "model_reasoning", 400),
+]
+ALL_TRACE_FIELDS = [f[0] for f in _TRACE_FIELDS] + ["chunks"]
+
+
+def fmt_badcases_rich(cases, fields=None):
+    """fields: 选中的 trace 字段短名列表；None=全部。trace 太长时只挑有效字段。"""
+    sel = set(fields) if fields else set(ALL_TRACE_FIELDS)
+    show_chunks = "chunks" in sel
     lines = []
     for c in cases:
         lines.append(f"  - {c.get('id', '?')}（{c.get('type', '?')}）：期望=[{c.get('expected', '')}] 实际=[{c.get('actual', '')}]"
                      + (f" 覆盖率/相似度=[{c.get('similarity')}]" if c.get("similarity") else ""))
         lines.append(f"      原文：{c.get('text', '')}")
         t = c.get("_trace_struct")
-        if t:
-            lines.append(f"      [Trace] 当前规则/画像：{(t.get('current_rules_profile') or '')[:1200]}")
-            lines.append(f"      [Trace] 合同原文窗口：{(t.get('context_window') or '（未提取到窗口）')[:1500]}")
-            lines.append(f"      [Trace] 模型抽取：{t.get('model_extracted', '（无）')}")
-            lines.append(f"      [Trace] 模型 reasoning：{t.get('model_reasoning', '（无）')}")
-            if t.get("chunks"):
-                lines.append("      [Trace] 可用 chunks：" + "; ".join(
-                    f"{ch.get('chunkId', '')}@{ch.get('section') or ''}" for ch in t["chunks"][:6]))
-        else:
+        if not t:
             lines.append("      [Trace] （未提供；只能判误抽/漏抽，类别低置信猜测）")
+            continue
+        for key, label, dkey, n in _TRACE_FIELDS:
+            if key not in sel:
+                continue
+            val = (t.get(dkey) or "（无）")
+            if len(val) > n:
+                val = val[:n] + "…"
+            lines.append(f"      [Trace] {label}：{val}")
+        if show_chunks and t.get("chunks"):
+            lines.append("      [Trace] 可用 chunks：" + "; ".join(
+                f"{ch.get('chunkId', '')}@{ch.get('section') or ''}" for ch in t["chunks"][:6]))
     return "\n".join(lines)
 
 
@@ -133,7 +149,7 @@ def opt_stage1_user(d):
                   clause=d.get("clause", ""), block_code=d.get("block_code", ""),
                   current_bom=d.get("current_bom", ""),
                   cands=fmt_cands(d.get("positive_candidates")),
-                  badcases=fmt_badcases_rich(d.get("badcases", [])),
+                  badcases=fmt_badcases_rich(d.get("badcases", []), d.get("trace_fields")),
                   recall_rules=recall_rules(d))
 
 
@@ -199,71 +215,143 @@ def print_prompts(data, mode, data_path):
     print(f"\n✓ 两段提示词已存：{f}（方便整体复制）\n")
 
 
-def run_one(client, data_path, mode_override, print_prompt):
+def dedup_step(items, threshold=0.8):
+    """近义去重并打印"去掉了哪些/组装了多少进提示词"。"""
+    if not items:
+        return []
+    kept, dropped = near_dedup_report(items, threshold)
+    if dropped:
+        print(f"  ℹ 候选去重：{len(items)} 条 → 组装 {len(kept)} 条进提示词（去掉 {len(dropped)} 条近重复）")
+        for d, m in dropped[:3]:
+            print(f"     ✗ 去掉「{str(d)[:36]}…」（≈ 保留「{str(m)[:36]}…」）")
+        if len(dropped) > 3:
+            print(f"     …另有 {len(dropped) - 3} 条近重复被去掉")
+    else:
+        print(f"  ℹ 候选 {len(kept)} 条（无需去重），全部组装进提示词")
+    return kept
+
+
+def render_readable(bom):
+    """BOM JSON → 业务可读文本（定义 / 规则 / 召回画像 / 诊断）。"""
+    L = [f"【条款】{bom.get('clause', '')}（{bom.get('block_code', '')}）\n",
+         "【业务定义】", (bom.get("semantic_definition") or "（无）").strip() + "\n",
+         "【抽取规则】", "🛑 绝对拦截规则（命中即放弃，针对误抽）："]
+    inter = (bom.get("extraction_rules") or {}).get("absolute_interception_rules") or []
+    L += [f"  {i}. {r.get('rule', '')}   —— {r.get('fixes', '')}" for i, r in enumerate(inter, 1)] if inter else ["  （无）"]
+    L.append("✅ 核心匹配规则（提取条件，针对漏抽）：")
+    core = (bom.get("extraction_rules") or {}).get("core_match_rules") or []
+    L += [f"  {i}. {r.get('rule', '')}   —— {r.get('fixes', '')}" for i, r in enumerate(core, 1)] if core else ["  （无）"]
+    L.append("")
+    rp = bom.get("recall_profile") or {}
+    L += ["【召回画像】",
+          f"- 正向关键词：{', '.join(rp.get('positive_keywords') or []) or '（无）'}",
+          f"- 易混淆词：{', '.join(rp.get('confusion_words') or []) or '（无）'}",
+          f"- 章节提示：{', '.join(rp.get('section_hints') or []) or '（无）'}",
+          "- 语义查询（向量召回用）："]
+    sq = rp.get("semantic_queries") or []
+    L += [f"    · {q}" for q in sq] if sq else ["    （无）"]
+    L.append("- 正例参考：")
+    pe = rp.get("positive_examples") or []
+    L += [f"    · {p}" for p in pe] if pe else ["    （无）"]
+    if bom.get("diagnosis"):
+        L.append("\n【Badcase 诊断】（仅 optimize）")
+        for d in bom["diagnosis"]:
+            L += [f"- {d.get('case_id', '')}（{d.get('case_type', '')}）[{d.get('category', '')}]",
+                  f"    根因：{d.get('reason', '')}",
+                  f"    建议修法：{d.get('suggested_fix', '')}"]
+    return "\n".join(L)
+
+
+def combine_and_render(paths, mode_override):
+    """把外网返回的 Stage1/Stage2 JSON 合并成最终 BOM，并渲染业务可读版。"""
+    yaml_p, s1_p, s2_p = paths
+    data = yaml.safe_load(Path(yaml_p).read_text(encoding="utf-8"))
+    mode = mode_override or data.get("mode") or "optimize"
+    s1 = parse_json(Path(s1_p).read_text(encoding="utf-8"))   # 容错：去代码块围栏
+    s2 = parse_json(Path(s2_p).read_text(encoding="utf-8"))
+    final = {
+        "mode": mode, "clause": data.get("clause", ""), "block_code": data.get("block_code", ""),
+        "semantic_definition": s2.get("semantic_definition", ""),
+        "recall_profile": s1.get("recall_profile", {}),
+        "extraction_rules": s2.get("extraction_rules", {}),
+    }
+    if mode == "optimize":
+        final["diagnosis"] = s1.get("diagnosis", [])
+    print("\n=== 业务可读 BOM ===")
+    print(render_readable(final))
+    out_dir = Path(__file__).parent / "output"
+    out_dir.mkdir(exist_ok=True)
+    stem = re.sub(r"[^\w一-龥]+", "_", Path(yaml_p).stem).strip("_") or "bom"
+    (out_dir / f"{stem}_BOM.json").write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out_dir / f"{stem}_BOM_readable.md").write_text(render_readable(final), encoding="utf-8")
+    print(f"\n✓ 已存：{out_dir / (stem + '_BOM.json')}（原始JSON）+ {stem}_BOM_readable.md（业务可读）")
+
+
+def run_one(client, data_path, mode_override, use_api):
     data = yaml.safe_load(data_path.read_text(encoding="utf-8"))
     mode = mode_override or data.get("mode") or "optimize"
 
-    # 组装前近义去重（控 token、防重复淹没）
-    raw = data.get("positive_candidates") or []
-    if raw:
-        deduped = near_dedup(raw, threshold=data.get("dedup_threshold", 0.8))
-        if len(deduped) < len(raw):
-            print(f"  ℹ 候选去重：{len(raw)} → {len(deduped)}（阈值 {data.get('dedup_threshold', 0.8)}）")
-        data["positive_candidates"] = deduped
-
+    print(f"→ {data_path.name} | 场景: {mode}")
+    data["positive_candidates"] = dedup_step(data.get("positive_candidates") or [],
+                                             data.get("dedup_threshold", 0.8))
     if mode == "optimize":
         try:
             for c in (data.get("badcases") or []):
                 c["_trace_struct"] = load_badcase_trace(c, data_path.parent)
+            print(f"  ℹ badcase {len(data.get('badcases') or [])} 条（trace 已加载）")
         except TraceError as e:
             print(f"\n✗ Trace 解析失败，已跳过 {data_path.name}：\n{e}\n")
             return
 
-    if print_prompt:
+    if not use_api:                       # PoC 默认：只生成提示词
         print_prompts(data, mode, data_path)
         return
 
-    print(f"→ {data_path.name} | 模型 {MODEL} | base_url: {BASE_URL or '(默认)'} | 场景: {mode}\n")
+    print(f"  调模型 {MODEL} | base_url: {BASE_URL or '(默认)'}\n")
     final = run_pipeline(client, data, mode)
     print("\n=== 最终 BOM ===")
-    print(json.dumps(final, ensure_ascii=False, indent=2))
+    print(render_readable(final))
     out_dir = Path(__file__).parent / "output"
     out_dir.mkdir(exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_name = re.sub(r"[^\w一-龥]+", "_", data_path.stem).strip("_") or "bom"
     out_file = out_dir / f"{safe_name}_{mode}_{stamp}.json"
     out_file.write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n✓ 已存档：{out_file}（拿去手工录入新/旧平台跑准确率）\n")
+    print(f"\n✓ 已存档：{out_file}\n")
 
 
 def main():
-    p = argparse.ArgumentParser(description="规则编排智能体 PoC（generate/optimize；支持单文件/目录批量/--print-prompt）")
+    p = argparse.ArgumentParser(
+        description="规则编排智能体 PoC（默认生成提示词去外网跑；--api 调模型；--combine 合并结果为可读BOM）")
     p.add_argument("data", nargs="?", default=str(Path(__file__).parent / "data" / "sample_slice.yaml"),
-                   help="yaml 文件，或目录（批量跑其中所有 *.yaml）")
+                   help="yaml 文件，或目录（批量）")
     p.add_argument("--mode", choices=["generate", "optimize"], default=None,
-                   help="覆盖 yaml 内的 mode；不填则用 yaml 的 mode 字段，再缺省 optimize")
-    p.add_argument("--print-prompt", action="store_true",
-                   help="只渲染+打印两段提示词（不调 API），方便 copy 到外网模型")
+                   help="覆盖 yaml 内的 mode；不填用 yaml 的 mode，再缺省 optimize")
+    p.add_argument("--api", action="store_true", help="调 config/llm.yaml 的模型（默认只生成提示词）")
+    p.add_argument("--combine", nargs=3, metavar=("YAML", "STAGE1_JSON", "STAGE2_JSON"),
+                   help="把外网返回的两段 JSON 合并成业务可读 BOM")
     args = p.parse_args()
+
+    if args.combine:
+        combine_and_render(args.combine, args.mode)
+        return
 
     target = Path(args.data)
     files = sorted(target.glob("*.yaml")) if target.is_dir() else [target]
 
     client = None
-    if not args.print_prompt:
+    if args.api:
         missing = [n for n, v in (("api_key", API_KEY), ("model", MODEL)) if not v]
         if missing:
-            sys.exit("✗ config/llm.yaml 未填写：" + "、".join(missing)
-                     + "。请 cp config/llm.example.yaml config/llm.yaml 并填写"
-                     + "（或用 --print-prompt 只拿提示词去外网跑）。")
-        from openai import OpenAI   # 懒加载：print-prompt 模式无需安装 openai
+            sys.exit("✗ config/llm.yaml 未填写：" + "、".join(missing) + "。PoC 默认只生成提示词（不加 --api）；"
+                     "如要自动调模型请填 config/llm.yaml。")
+        from openai import OpenAI   # 懒加载：默认(出提示词)模式无需装 openai
         client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
     if len(files) > 1:
         print(f"========== 共 {len(files)} 个 yaml ==========\n")
     for f in files:
-        print(f"##### {f.name} #####")
-        run_one(client, f, args.mode, args.print_prompt)
+        run_one(client, f, args.mode, args.api)
 
 
 if __name__ == "__main__":

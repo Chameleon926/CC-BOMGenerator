@@ -20,3 +20,20 @@ def near_dedup(items, threshold=0.8):
             continue
         kept.append(it)
     return kept
+
+
+def near_dedup_report(items, threshold=0.8):
+    """同 near_dedup，但额外返回被去掉的项及其命中的保留项，便于打印"去掉了哪些"。
+
+    返回 (kept, dropped)；dropped = [(被去掉项, 命中的保留项), ...]。
+    """
+    kept = []
+    dropped = []
+    for it in items:
+        s = str(it)
+        hit = next((k for k in kept if difflib.SequenceMatcher(None, s, str(k)).ratio() >= threshold), None)
+        if hit is None:
+            kept.append(it)
+        else:
+            dropped.append((it, hit))
+    return kept, dropped
