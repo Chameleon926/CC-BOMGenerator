@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合同抽取辅助工具 — 交互原型</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --surface:#fff; --sidebar:#0f1b3d; --sidebar-2:#16224a; --sidebar-hover:#1d2c58;
+    --text:#1e293b; --muted:#64748b; --faint:#94a3b8; --border:#e6eaf2;
+    --primary:#4f46e5; --primary-2:#6366f1; --primary-soft:#eef0fc;
+    --success:#16a34a; --success-soft:#dcfce7;
+    --warn:#d97706; --warn-soft:#fef3c7;
+    --danger:#dc2626; --danger-soft:#fee2e2;
+    --teal:#0d9488; --teal-soft:#ccfbf1;
+    --shadow:0 1px 3px rgba(15,27,61,.06),0 1px 2px rgba(15,27,61,.05);
+    --shadow-lg:0 10px 30px -12px rgba(15,27,61,.18);
+    --radius:12px;
+    --surface-2:#f1f5f9;
+  }
+  [data-theme="dark"]{
+    --bg:#0b1220; --surface:#131c2e; --surface-2:#1b2740; --text:#e2e8f0; --muted:#94a3b8; --faint:#64748b;
+    --border:#243049; --primary-soft:#1e2a4a; --sidebar:#070d1a; --sidebar-hover:#15213c;
+    --success-soft:#0f3326; --warn-soft:#3a2a0a; --danger-soft:#3a1515; --teal-soft:#0c2e2a;
+    --shadow:0 1px 3px rgba(0,0,0,.4); --shadow-lg:0 12px 34px -12px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .app{display:flex;height:100vh;overflow:hidden}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{width:232px;background:var(--sidebar);color:#c7d0e3;display:flex;flex-direction:column;flex-shrink:0}
+  .brand{padding:20px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .brand .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--primary-2),#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;flex-shrink:0}
+  .brand .name{font-size:14px;font-weight:600;color:#fff;line-height:1.25}
+  .brand .sub{font-size:11px;color:#7e8aa8}
+  .nav{padding:12px 10px;flex:1;overflow-y:auto}
+  .nav-group{font-size:10.5px;color:#5e6b8a;text-transform:uppercase;letter-spacing:.08em;padding:14px 10px 6px;font-weight:600}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;cursor:pointer;font-size:13.5px;color:#b8c2d8;transition:.15s;margin-bottom:2px}
+  .nav-item:hover{background:var(--sidebar-hover);color:#fff}
+  .nav-item.active{background:var(--primary);color:#fff;box-shadow:0 4px 12px -3px rgba(79,70,229,.5)}
+  .nav-item svg{width:17px;height:17px;flex-shrink:0}
+  .nav-item .badge{margin-left:auto;background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600}
+  .sidebar-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.07);font-size:11.5px;color:#7e8aa8}
+  .sidebar-foot .me{display:flex;align-items:center;gap:9px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600}
+
+  /* ---------- Main ---------- */
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .topbar{height:60px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 26px;gap:16px;flex-shrink:0}
+  .topbar h1{font-size:16px;font-weight:600}
+  .topbar .crumb{color:var(--faint);font-size:13px;font-weight:400}
+  .topbar .spacer{flex:1}
+  .topbar .pill{display:inline-flex;align-items:center;gap:6px;background:var(--success-soft);color:var(--success);font-size:12px;font-weight:600;padding:5px 11px;border-radius:20px}
+  .topbar .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface);font-size:13px;font-weight:500;cursor:pointer;color:var(--text);transition:.15s;font-family:inherit}
+  .btn:hover{background:var(--surface-2);border-color:#cbd5e1}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.primary:hover{background:#4338ca}
+  .btn svg{width:15px;height:15px}
+  .btn.sm{padding:5px 10px;font-size:12px}
+
+  .content{flex:1;overflow-y:auto;padding:24px 26px}
+  .view{display:none;max-width:1180px;margin:0 auto;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ---------- Generic ---------- */
+  .grid{display:grid;gap:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card-pad{padding:18px 20px}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card h3 .hint{font-size:12px;color:var(--faint);font-weight:400}
+  .row{display:flex;gap:16px;align-items:center}
+  .muted{color:var(--muted)}
+  .faint{color:var(--faint)}
+  .tag{display:inline-flex;align-items:center;font-size:11.5px;padding:2px 8px;border-radius:6px;font-weight:500;line-height:1.5}
+  .tag.indigo{background:var(--primary-soft);color:var(--primary)}
+  .tag.teal{background:var(--teal-soft);color:var(--teal)}
+  .tag.green{background:var(--success-soft);color:var(--success)}
+  .tag.amber{background:var(--warn-soft);color:var(--warn)}
+  .tag.red{background:var(--danger-soft);color:var(--danger)}
+  .tag.gray{background:#f1f5f9;color:#475569}
+  .section-title{font-size:18px;font-weight:700;margin-bottom:4px}
+  .section-desc{color:var(--muted);font-size:13px;margin-bottom:18px}
+
+  /* ---------- Library ---------- */
+  .lib-bar{display:flex;gap:12px;margin-bottom:18px;align-items:center}
+  .search{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:8px 13px}
+  .search input{border:none;outline:none;flex:1;font-size:13px;font-family:inherit;background:transparent}
+  .filter{display:flex;gap:6px}
+  .chip{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:12.5px;cursor:pointer;color:var(--muted)}
+  .chip.on{background:var(--primary-soft);border-color:var(--primary);color:var(--primary);font-weight:500}
+  .lib-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .el-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:.18s;box-shadow:var(--shadow)}
+  .el-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:#c7d2fe}
+  .el-card .top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+  .el-card .ename{font-size:15px;font-weight:600}
+  .el-card .meta{font-size:12px;color:var(--muted);margin:2px 0 10px}
+  .el-card .desc{font-size:12.5px;color:#475569;line-height:1.55;height:38px;overflow:hidden}
+  .el-card .stat{display:flex;justify-content:space-between;align-items:center;margin-top:13px;padding-top:12px;border-top:1px dashed var(--border)}
+  .acc{font-size:12px}
+  .acc b{font-size:17px;font-weight:700}
+  .acc.ok b{color:var(--success)} .acc.mid b{color:var(--warn)} .acc.low b{color:var(--danger)}
+
+  /* ---------- Insight ---------- */
+  .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px 15px;box-shadow:var(--shadow)}
+  .kpi .k{font-size:11.5px;color:var(--muted);margin-bottom:6px}
+  .kpi .v{font-size:21px;font-weight:700}
+  .kpi .v small{font-size:12px;color:var(--faint);font-weight:500}
+  .kpi.accent{background:linear-gradient(135deg,var(--primary),#7c3aed);border:none;color:#fff}
+  .kpi.accent .k{color:rgba(255,255,255,.8)}
+  .kpi.accent .v small{color:rgba(255,255,255,.75)}
+  .two-col{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+  .tab{padding:9px 14px;font-size:13px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+  .tab.on{color:var(--primary);border-color:var(--primary)}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12.5px}
+  .bar-row .lbl{width:120px;color:#475569;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar-track{flex:1;height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden;position:relative}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--primary-2),var(--primary));border-radius:6px;display:flex;align-items:center;padding-left:8px;color:#fff;font-size:11px;font-weight:600}
+  .pattern{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0f172a;color:#7dd3fc;padding:7px 10px;border-radius:7px;font-size:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+  .pattern .cov{color:#86efac;font-size:11px}
+  .kw{display:inline-block;background:var(--primary-soft);color:var(--primary);padding:4px 10px;border-radius:7px;font-size:12px;margin:0 6px 6px 0}
+  .kw.noise{background:#fef3c7;color:#b45309}
+  .dedup-item{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:9px;margin-bottom:8px}
+  .dedup-item.merged{opacity:.45;background:var(--surface-2)}
+  .dedup-item .pair{flex:1;font-size:12.5px}
+  .dedup-item .pair .v{font-weight:600}
+  .dedup-item .conf{font-size:11px;color:var(--faint)}
+  .mini-btn{padding:4px 10px;border-radius:6px;font-size:11.5px;cursor:pointer;border:1px solid var(--border);background:#fff;font-family:inherit}
+  .mini-btn.ok{background:var(--success-soft);color:var(--success);border-color:#bbf7d0}
+  .mini-btn.no{background:var(--surface);color:var(--muted)}
+
+  /* ---------- Generate ---------- */
+  .gen-layout{display:grid;grid-template-columns:340px 1fr;gap:16px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px;color:#334155}
+  .field .sub{font-weight:400;color:var(--faint);font-size:11.5px}
+  .inp{width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;transition:.15s;background:#fff}
+  .inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+  textarea.inp{resize:vertical;min-height:70px;line-height:1.6}
+  .check-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .check{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;cursor:pointer}
+  .check.on{background:var(--primary-soft);border-color:#c7d2fe;color:var(--primary)}
+  .check .bx{width:15px;height:15px;border-radius:4px;border:1.5px solid #cbd5e1;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .check.on .bx{background:var(--primary);border-color:var(--primary);color:#fff}
+  .upload{border:1.5px dashed #cbd5e1;border-radius:9px;padding:18px;text-align:center;color:var(--muted);font-size:12.5px;cursor:pointer}
+  .upload:hover{border-color:var(--primary);background:var(--primary-soft);color:var(--primary)}
+  .upload .fname{color:var(--success);font-weight:600}
+  .gen-out{font-size:13px}
+  .gen-block{margin-bottom:16px}
+  .gen-block .bt{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--primary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+  .gen-block .body{background:#fafbfd;border:1px solid var(--border);border-radius:9px;padding:12px 14px;font-size:13px;line-height:1.7;color:#334155}
+  .gen-block .body ul{padding-left:18px}
+  .typing::after{content:"▋";color:var(--primary);animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ---------- Optimize ---------- */
+  .acc-compare{display:grid;grid-template-columns:1fr 60px 1fr;gap:0;align-items:stretch;margin-bottom:16px}
+  .acc-box{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:16px;text-align:center;box-shadow:var(--shadow)}
+  .acc-box .lbl{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .acc-box .num{font-size:30px;font-weight:700}
+  .acc-box.before .num{color:var(--warn)}
+  .acc-box.after .num{color:var(--success)}
+  .acc-arrow{display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--faint)}
+  .err-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .err-table th{text-align:left;color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border);font-size:11.5px}
+  .err-table td{padding:9px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  .err-table .got{color:var(--danger)}
+  .err-table .exp{color:var(--success);font-weight:500}
+  .prompt-box{background:#0f172a;color:#e2e8f0;border-radius:11px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;max-height:260px;overflow-y:auto}
+
+  /* ---------- Desens ---------- */
+  .drop-zone{border:2px dashed #cbd5e1;border-radius:12px;padding:42px;text-align:center;color:var(--muted);background:var(--surface)}
+  .drop-zone:hover{border-color:var(--primary);background:var(--primary-soft)}
+  .drop-zone .ico{font-size:34px;margin-bottom:8px}
+  .doc-preview{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .doc-pane{background:#fff;border:1px solid var(--border);border-radius:11px;padding:18px;font-size:12.5px;line-height:1.9;min-height:280px;box-shadow:var(--shadow)}
+  .doc-pane .ph{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;font-weight:600}
+  .mask{background:#fef9c3;border-radius:3px;padding:0 2px;border-bottom:2px solid #ca8a04}
+  .masked{background:#e0e7ff;color:#3730a3;border-radius:3px;padding:0 3px;font-weight:500}
+  .ds-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .ds-table th{text-align:left;background:var(--surface-2);color:var(--muted);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--border);font-size:11.5px}
+  .ds-table td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-family:ui-monospace,monospace;font-size:12px}
+  .ds-table .before{color:#475569}
+  .ds-table .after{color:var(--primary);font-weight:600}
+
+  /* ---------- Composer ---------- */
+  .comp-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .comp-out{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:20px;font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.8;white-space:pre-wrap;min-height:420px}
+  .comp-out .ph-var{color:#fbbf24}
+  .comp-out .ph-empty{color:#64748b;font-style:italic}
+
+  /* ---------- Settings ---------- */
+  .switch{position:relative;width:38px;height:21px;background:#cbd5e1;border-radius:20px;cursor:pointer;transition:.2s;flex-shrink:0}
+  .switch.on{background:var(--success)}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;background:#fff;border-radius:50%;transition:.2s}
+  .switch.on::after{left:19px}
+  .set-table{width:100%;border-collapse:collapse;font-size:13px}
+  .set-table th{text-align:left;background:var(--surface-2);color:var(--muted);font-weight:600;padding:11px 14px;border-bottom:1px solid var(--border);font-size:12px}
+  .set-table td{padding:12px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+  .set-table tr:hover td{background:var(--surface-2)}
+  .mono{font-family:ui-monospace,monospace;font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:5px;color:#334155}
+
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);background:#0f172a;color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:999;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:8px}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .footer-note{margin-top:22px;padding:14px 18px;background:var(--primary-soft);border-radius:10px;font-size:12.5px;color:#4338ca;border:1px dashed #c7d2fe}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* icon / theme button */
+  .icon-btn{width:36px;height:36px;border-radius:9px;border:1px solid var(--border);background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px;transition:.15s}
+  .icon-btn:hover{color:var(--primary);border-color:var(--primary)}
+
+  /* back link */
+  .back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--muted);cursor:pointer;font-size:13px;margin-bottom:14px;font-weight:500}
+  .back-btn:hover{color:var(--primary)}
+
+  /* detail page */
+  .detail-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .detail-head .big{font-size:24px;font-weight:700;line-height:1.2}
+  .detail-field{margin-bottom:14px}
+  .detail-field .ft{font-size:11.5px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
+  .detail-field .body{font-size:13px;line-height:1.7;color:var(--text)}
+  .detail-field .body ul{padding-left:18px}
+
+  /* donut chart */
+  .donut-wrap{display:flex;align-items:center;gap:20px}
+  .donut{width:118px;height:118px;border-radius:50%;position:relative;flex-shrink:0}
+  .donut::after{content:"";position:absolute;inset:20px;background:var(--surface);border-radius:50%;z-index:1}
+  .donut .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2}
+  .donut .center b{font-size:21px;font-weight:700}
+  .donut .center small{font-size:10.5px;color:var(--muted)}
+  .legend{font-size:12.5px}
+  .legend .li{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .legend .sw{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+
+  /* version timeline */
+  .vlist{position:relative;padding-left:24px}
+  .vlist::before{content:"";position:absolute;left:6px;top:8px;bottom:8px;width:2px;background:var(--border)}
+  .vitem{position:relative;margin-bottom:18px}
+  .vitem:last-child{margin-bottom:0}
+  .vitem::before{content:"";position:absolute;left:-24px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--surface);border:2px solid var(--border);z-index:2}
+  .vitem.current::before{background:var(--primary);border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-soft)}
+  .vitem .vhead{display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap}
+  .vitem .vnum{font-weight:700;font-size:13.5px}
+  .vitem .vmeta{font-size:12px;color:var(--muted)}
+  .vitem .vnote{font-size:12.5px;color:var(--text)}
+
+  /* sparkline (accuracy over versions) */
+  .spark{display:flex;align-items:flex-end;gap:14px;height:84px}
+  .spark .bar{flex:1;background:linear-gradient(var(--primary-2),var(--primary));border-radius:6px 6px 0 0;position:relative;min-width:20px;transition:.3s}
+  .spark .bar.cur{background:linear-gradient(#22c55e,#16a34a)}
+  .spark .bar span{position:absolute;top:-30px;left:50%;transform:translateX(-50%);font-size:10.5px;color:var(--muted);white-space:nowrap;text-align:center;line-height:1.3}
+  .spark .bar span b{display:block;font-size:12px;color:var(--text)}
+
+  /* empty + shimmer */
+  .empty{text-align:center;padding:42px 20px;color:var(--faint)}
+  .empty .ico{font-size:30px;margin-bottom:8px}
+  .shimmer{background:linear-gradient(90deg,var(--surface-2) 25%,#e2e8f0 37%,var(--surface-2) 63%);background-size:400% 100%;animation:sh 1.3s ease infinite;height:14px;border-radius:6px;margin-bottom:9px}
+  [data-theme="dark"] .shimmer{background:linear-gradient(90deg,#1a2438 25%,#243049 37%,#1a2438 63%);background-size:400% 100%}
+  @keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+  .file-input{display:none}
+  .upload.has-file{border-color:var(--success);background:var(--success-soft);color:var(--success)}
+
+  /* toast theme */
+  [data-theme="dark"] .toast{background:#1e293b;border:1px solid var(--border)}
+
+  /* responsive */
+  @media(max-width:980px){
+    .sidebar{width:64px}
+    .sidebar .brand .name,.sidebar .brand .sub,.sidebar .nav-item span:not(.badge),.sidebar .nav-group,.sidebar-foot{display:none}
+    .sidebar .nav-item{justify-content:center}
+    .lib-grid,.kpi-row{grid-template-columns:repeat(2,1fr)}
+    .two-col,.gen-layout,.comp-layout,.doc-preview{grid-template-columns:1fr}
+  }
+  @media(max-width:640px){
+    .kpi-row{grid-template-columns:repeat(2,1fr)}
+    .lib-grid{grid-template-columns:1fr}
+    .content{padding:16px}
+  }
+</style>
+</head>
+<body>
+<input type="file" class="file-input" id="fileInput">
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">⚖</div>
+      <div>
+        <div class="name">合同抽取辅助</div>
+        <div class="sub">Contract Extract Studio</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-group">数据驱动</div>
+      <div class="nav-item active" data-view="library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg>条款/要素库
+      </div>
+      <div class="nav-item" data-view="insight">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>测试集洞察
+      </div>
+      <div class="nav-item" data-view="generate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>辅助生成
+      </div>
+      <div class="nav-item" data-view="optimize">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg>辅助优化
+      </div>
+      <div class="nav-group">脱敏工具</div>
+      <div class="nav-item" data-view="desens-doc">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>文档脱敏
+      </div>
+      <div class="nav-item" data-view="desens-data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>数据脱敏
+      </div>
+      <div class="nav-group">辅助</div>
+      <div class="nav-item" data-view="composer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/></svg>提示词拼装
+      </div>
+      <div class="nav-item" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>设置
+      </div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="me">
+        <div class="avatar">Y</div>
+        <div>yang<br><span style="color:#5e6b8a">法务工程组</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <header class="topbar">
+      <h1 id="title">条款/要素库</h1>
+      <span class="crumb" id="crumb">/ 合同抽取辅助</span>
+      <div class="spacer"></div>
+      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="切换主题">🌙</button>
+      <span class="pill"><span class="dot"></span> GLM-5 已连接</span>
+      <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>导出</button>
+    </header>
+
+    <div class="content">
+
+      <!-- ===== LIBRARY ===== -->
+      <section class="view active" id="view-library">
+        <div class="section-title">条款/要素库</div>
+        <div class="section-desc">由标注数据驱动的条款/要素定义中心。每个要素沉淀定义、抽取规则、关键词、画像与提示词，并保留优化版本。</div>
+        <div class="lib-bar">
+          <div class="search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+            <input placeholder="搜索要素名称、关键词…">
+          </div>
+          <div class="filter">
+            <span class="chip on">全部 9</span>
+            <span class="chip">要素 6</span>
+            <span class="chip">条款 3</span>
+            <span class="chip">待优化 4</span>
+          </div>
+          <button class="btn primary" onclick="go('generate')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>生成新要素</button>
+        </div>
+        <div class="lib-grid">
+          <div class="el-card">
+            <div class="top"><div class="ename">合同金额</div><span class="tag indigo">要素</span></div>
+            <div class="meta">数值型 · 5,230 条标注 · v3</div>
+            <div class="desc">合同标的总金额，含税/不含税需明确，支持万元/亿元单位换算。</div>
+            <div class="stat"><span class="acc ok"><b>94.2%</b> 抽取准确率</span><span class="tag green">已优化</span></div>
+          </div>
+          <div class="el-card">
+            <div class="top"><div class="ename">甲方</div><span class="tag indigo">要素</span></div>
+            <div class="meta">实体型 · 4,108 条标注 · v2</div>
+            <div class="desc">合同中承担主要义务的一方主体全称，需区分总公司与分公司。</div>
+            <div class="stat"><span class="acc ok"><b>91.5%</b></span><span class="tag green">已优化</span></div>
+          </div>
+          <div class="el-card">
+            <div class="top"><div class="ename">签订日期</div><span class="tag indigo">要素</span></div>
+            <div class="meta">日期型 · 5,001 条标注 · v1</div>
+            <div class="desc">合同正式签署的日期，统一归一化为 ISO 格式。</div>
+            <div class="stat"><span class="acc mid"><b>86.0%</b></span><span class="tag amber">待优化</span></div>
+          </div>
+          <div class="el-card">
+            <div class="top"><div class="ename">付款方式</div><span class="tag indigo">要素</span></div>
+            <div class="meta">枚举型 · 3,872 条标注 · v2</div>
+            <div class="desc">款项支付方式：一次性/分期/按里程碑/验收后等。</div>
+            <div class="stat"><span class="acc ok"><b>92.8%</b></span><span class="tag green">已优化</span></div>
+          </div>
+          <div class="el-card">
+            <div class="top"><div class="ename">违约责任</div><span class="tag teal">条款</span></div>
+            <div class="meta">文本型 · 2,640 条标注 · v1</div>
+            <div class="desc">违约情形及对应的赔偿/解除等责任条款完整描述。</div>
+            <div class="stat"><span class="acc low"><b>71.3%</b></span><span class="tag amber">待优化</span></div>
+          </div>
+          <div class="el-card">
+            <div class="top"><div class="ename">合同期限</div><span class="tag indigo">要素</span></div>
+            <div class="meta">结构化 · 4,530 条标注 · v1</div>
+            <div class="desc">合同有效期起止区间，含自动续约情形。</div>
+            <div class="stat"><span class="acc mid"><b>83.6%</b></span><span class="tag amber">待优化</span></div>
+          </div>
+          <div class="el-card">
+            <div class="top"><div class="ename">保密条款</div><span class="tag teal">条款</span></div>
+            <div class="meta">文本块 · 2,180 条标注 · v2</div>
+            <div class="desc">保密信息定义、保密义务、保密期限与例外情形。</div>
+            <div class="stat"><span class="acc ok"><b>88.1%</b></span><span class="tag green">已优化</span></div>
+          </div>
+          <div class="el-card">
+            <div class="top"><div class="ename">争议解决</div><span class="tag teal">条款</span></div>
+            <div class="meta">文本块 · 1,950 条标注 · v1</div>
+            <div class="desc">争议解决方式（协商 / 仲裁 / 诉讼）及管辖约定。</div>
+            <div class="stat"><span class="acc mid"><b>79.4%</b></span><span class="tag amber">待优化</span></div>
+          </div>
+          <div class="el-card">
+            <div class="top"><div class="ename">标的物</div><span class="tag indigo">要素</span></div>
+            <div class="meta">文本型 · 4,712 条标注 · v1</div>
+            <div class="desc">合同交易对象（货物 / 服务 / 工程）的名称与规格。</div>
+            <div class="stat"><span class="acc ok"><b>90.2%</b></span><span class="tag gray">初版</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== INSIGHT (核心) ===== -->
+      <section class="view" id="view-insight">
+        <div class="section-title">测试集洞察 · 合同金额</div>
+        <div class="section-desc">上传的 5,230 条标注经「解析归一化 → 精确+语义去重 → 统计 → 特征抽取」后的数据画像。这是生成与优化的统一数据输入。</div>
+
+        <div class="kpi-row">
+          <div class="kpi"><div class="k">标注总量</div><div class="v">5,230</div></div>
+          <div class="kpi"><div class="k">唯一值</div><div class="v">1,812</div></div>
+          <div class="kpi accent"><div class="k">去重率（精确+语义）</div><div class="v">65<small>%</small></div></div>
+          <div class="kpi"><div class="k">空值率</div><div class="v">3.0<small>%</small></div></div>
+          <div class="kpi"><div class="k">值类型</div><div class="v" style="font-size:15px;padding-top:4px">数值</div></div>
+          <div class="kpi"><div class="k">取值区间</div><div class="v" style="font-size:15px;padding-top:4px">0 ~ 8.5<small>亿</small></div></div>
+        </div>
+
+        <div class="two-col" style="margin-bottom:16px">
+          <div class="card card-pad">
+            <h3>分布与特征 <span class="hint">· 点击页签切换</span></h3>
+            <div class="tabs" id="insightTabs">
+              <div class="tab on" data-t="dist">数值分布</div>
+              <div class="tab" data-t="pattern">格式模板</div>
+              <div class="tab" data-t="kw">触发词</div>
+            </div>
+            <div id="tab-dist">
+              <div class="bar-row"><span class="lbl">0 ~ 10万</span><div class="bar-track"><div class="bar-fill" style="width:48%">2,510 (48%)</div></div></div>
+              <div class="bar-row"><span class="lbl">10万 ~ 100万</span><div class="bar-track"><div class="bar-fill" style="width:27%">1,412 (27%)</div></div></div>
+              <div class="bar-row"><span class="lbl">100万 ~ 1000万</span><div class="bar-track"><div class="bar-fill" style="width:15%">785 (15%)</div></div></div>
+              <div class="bar-row"><span class="lbl">1000万 ~ 1亿</span><div class="bar-track"><div class="bar-fill" style="width:7%">366 (7%)</div></div></div>
+              <div class="bar-row"><span class="lbl">> 1亿</span><div class="bar-track"><div class="bar-fill" style="width:3%;background:#fbbf24">157 (3%)</div></div></div>
+              <div style="font-size:12px;color:var(--faint);margin-top:10px">中位数 ¥48万 · 均值 ¥312万 · 离群点 157 条（多见于工程类合同）</div>
+            </div>
+            <div id="tab-pattern" style="display:none">
+              <div class="pattern"><span>\d{1,3}(,\d{3})*(\.\d+)?元</span><span class="cov">覆盖 78%</span></div>
+              <div class="pattern"><span>\d+(\.\d+)?万元</span><span class="cov">覆盖 15%</span></div>
+              <div class="pattern"><span>\d+(\.\d+)?亿元</span><span class="cov">覆盖 4%</span></div>
+              <div class="pattern"><span>人民币\d+元整</span><span class="cov">覆盖 2%</span></div>
+              <div class="pattern"><span style="color:#fca5a5">未覆盖 1%（大写金额）</span><span class="cov" style="color:#fca5a5">需补规则</span></div>
+            </div>
+            <div id="tab-kw" style="display:none">
+              <span class="kw">不含税</span><span class="kw">总价</span><span class="kw">含税</span><span class="kw">暂定</span><span class="kw">合同价款</span><span class="kw">暂估</span><span class="kw noise">金额（噪声）</span><span class="kw noise">人民币（噪声）</span>
+              <div style="font-size:12px;color:var(--faint);margin-top:12px">🟣 触发词用于生成抽取规则；🟡 噪声词已被标记，避免误触发。</div>
+            </div>
+          </div>
+
+          <div class="card card-pad">
+            <h3>语义去重待确认 <span class="tag amber">12</span></h3>
+            <div id="dedupList">
+              <div class="dedup-item">
+                <div class="pair"><span class="v">120万元</span> ≈ <span class="v">1,200,000元</span><div class="conf">数值等价 · 置信 0.99</div></div>
+                <button class="mini-btn ok" onclick="resolveDedup(this,'merged')">合并</button>
+                <button class="mini-btn no" onclick="resolveDedup(this,'rejected')">拒绝</button>
+              </div>
+              <div class="dedup-item">
+                <div class="pair"><span class="v">甲方：A科技公司</span> ≈ <span class="v">甲方：A科技股份有限公司</span><div class="conf">主体近似 · 置信 0.91</div></div>
+                <button class="mini-btn ok" onclick="resolveDedup(this,'merged')">合并</button>
+                <button class="mini-btn no" onclick="resolveDedup(this,'rejected')">拒绝</button>
+              </div>
+              <div class="dedup-item">
+                <div class="pair"><span class="v">¥500,000</span> ≈ <span class="v">伍拾万元整</span><div class="conf">阿拉伯/大写 · 置信 0.86</div></div>
+                <button class="mini-btn ok" onclick="resolveDedup(this,'merged')">合并</button>
+                <button class="mini-btn no" onclick="resolveDedup(this,'rejected')">拒绝</button>
+              </div>
+              <div class="dedup-item">
+                <div class="pair"><span class="v">约300万</span> ≈ <span class="v">3,000,000元</span><div class="conf">含约数修饰 · 置信 0.74 · ⚠需复核</div></div>
+                <button class="mini-btn ok" onclick="resolveDedup(this,'merged')">合并</button>
+                <button class="mini-btn no" onclick="resolveDedup(this,'rejected')">拒绝</button>
+              </div>
+            </div>
+            <button class="btn sm" style="margin-top:8px;width:100%;justify-content:center">批量操作全部 12 条</button>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <h3>难例样本 <span class="hint">· 与主流模式冲突，可一键送入优化</span> <button class="btn sm primary" style="margin-left:auto" onclick="go('optimize')">送入辅助优化 →</button></h3>
+          <table class="err-table">
+            <thead><tr><th style="width:42%">原文片段</th><th>标注值</th><th>问题</th></tr></thead>
+            <tbody>
+              <tr><td>…合同总金额为人民币<b>大写：叁佰万元整</b>…</td><td>3,000,000元</td><td><span class="tag red">大写未覆盖</span></td></tr>
+              <tr><td>…价款约<b>300万</b>（以实际结算为准）…</td><td>约3,000,000元</td><td><span class="tag amber">含约数</span></td></tr>
+              <tr><td>…不含税金额1,000,000元，<b>税费另计</b>…</td><td>1,000,000元(不含税)</td><td><span class="tag amber">含税/不含税歧义</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== GENERATE ===== -->
+      <section class="view" id="view-generate">
+        <div class="section-title">辅助生成 · 要素 / 条款定义</div>
+        <div class="section-desc">选择类型（要素/条款）+ 输入名称 + 标注集合，系统分析标注数据并注入通识，按类型生成对应定义/规则/示例/画像。</div>
+        <div class="gen-layout">
+          <div class="card card-pad">
+            <div class="field">
+              <label>要素/条款名称</label>
+              <input class="inp" value="合同金额">
+            </div>
+            <div class="field">
+              <label>类型 <span class="sub">· 决定生成模板与画像口径</span></label>
+              <div class="filter">
+                <span class="chip on" id="t-element" onclick="setGenType('element')">要素（字段值）</span>
+                <span class="chip" id="t-clause" onclick="setGenType('clause')">条款（语义块）</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>标注值集合 <span class="sub">· 已解析为 TestSetProfile</span></label>
+              <div class="upload"><div class="fname">✓ 合同金额_标注_v3.xlsx</div><div style="font-size:11px;margin-top:4px">5,230 条 · 唯一 1,812 · 去重 65%</div></div>
+            </div>
+            <div class="field">
+              <label>生成字段</label>
+              <div class="check-grid" id="fields-element">
+                <div class="check on" onclick="tog(this)">定义</div>
+                <div class="check on" onclick="tog(this)">抽取规则</div>
+                <div class="check on" onclick="tog(this)">示例</div>
+                <div class="check on" onclick="tog(this)">关键词</div>
+                <div class="check on" onclick="tog(this)">画像</div>
+                <div class="check" onclick="tog(this)">提示词</div>
+              </div>
+              <div class="check-grid" id="fields-clause" style="display:none">
+                <div class="check on" onclick="tog(this)">定义</div>
+                <div class="check on" onclick="tog(this)">识别规则</div>
+                <div class="check on" onclick="tog(this)">示例段落</div>
+                <div class="check on" onclick="tog(this)">触发句式</div>
+                <div class="check on" onclick="tog(this)">条款画像</div>
+                <div class="check" onclick="tog(this)">条款提示词</div>
+              </div>
+            </div>
+            <div class="field">
+              <label>示例数量 <span class="sub">· 分层抽样</span></label>
+              <input class="inp" type="number" value="8">
+            </div>
+            <button class="btn primary" style="width:100%;justify-content:center" onclick="genDemo()">⚡ 开始生成</button>
+          </div>
+
+          <div class="card card-pad gen-out" id="genOut">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <h3 style="margin:0">生成结果 <span class="tag green" style="margin-left:6px">流式输出中</span></h3>
+              <div><button class="btn sm">重新生成</button> <button class="btn sm primary">保存为 v1</button></div>
+            </div>
+            <div id="out-element">
+            <div class="gen-block">
+              <div class="bt">◆ 定义</div>
+              <div class="body">合同标的的总价款金额。需区分含税与不含税口径，支持阿拉伯数字与中文大写、万元/亿元单位。<span class="typing"></span></div>
+            </div>
+            <div class="gen-block">
+              <div class="bt">◆ 抽取规则</div>
+              <div class="body"><ul>
+                <li>触发词：合同金额/总价/合同价款/暂估/暂定 + 数值</li>
+                <li>优先取「不含税金额」前缀，标注是否含税</li>
+                <li>中文大写（叁佰万元整）按数位换算为阿拉伯</li>
+                <li>含「约/暂」修饰时保留约数标记</li>
+              </ul></div>
+            </div>
+            <div class="gen-block">
+              <div class="bt">◆ 关键词</div>
+              <div class="body"><span class="kw">不含税</span><span class="kw">总价</span><span class="kw">合同价款</span><span class="kw">暂估</span><span class="kw">人民币</span></div>
+            </div>
+            <div class="gen-block">
+              <div class="bt">◆ 画像</div>
+              <div class="body">数值型 · 中位 ¥48万 · 78% 为「X,XXX.XX元」格式 · 1% 大写金额需特殊处理 · 含税/不含税歧义率 4%。</div>
+            </div>
+            </div>
+            <div id="out-clause" style="display:none">
+            <div class="gen-block">
+              <div class="bt">◆ 定义</div>
+              <div class="body">违约责任条款 — 约定一方不履行或瑕疵履行合同义务时应承担的法律责任（继续履行、补救、赔偿损失、支付违约金、解除合同等）。<span class="typing"></span></div>
+            </div>
+            <div class="gen-block">
+              <div class="bt">◆ 识别规则</div>
+              <div class="body"><ul>
+                <li>触发标题：「违约责任」「责任与赔偿」章节</li>
+                <li>触发句式：「应当承担」「支付违约金」「赔偿损失」「有权解除」</li>
+                <li>边界：从触发标题起，至下一同级章节标题止</li>
+              </ul></div>
+            </div>
+            <div class="gen-block">
+              <div class="bt">◆ 触发句式</div>
+              <div class="body"><span class="kw">应当承担</span><span class="kw">支付违约金</span><span class="kw">赔偿损失</span><span class="kw">有权解除</span><span class="kw">每日…‰</span></div>
+            </div>
+            <div class="gen-block">
+              <div class="bt">◆ 条款画像</div>
+              <div class="body">文本块 · 平均 180 字 · 92% 位于独立「违约责任」章 · 必含子要素：违约情形 / 违约金比例 / 解除权 · 8% 与「不可抗力」混写。</div>
+            </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== OPTIMIZE ===== -->
+      <section class="view" id="view-optimize">
+        <div class="section-title">辅助优化</div>
+        <div class="section-desc">回测驱动：用当前提示词在测试集上跑抽取，对比真值找出错误样本，再驱动提示词/定义迭代。要素与条款均支持，指标口径随类型切换。</div>
+        <div class="filter" style="margin-bottom:14px">
+          <span class="chip on" id="ot-element" onclick="setOptType('element')">要素：合同金额</span>
+          <span class="chip" id="ot-clause" onclick="setOptType('clause')">条款：违约责任</span>
+          <span class="muted" style="font-size:12px;margin-left:8px" id="opt-metric">回测指标：值匹配准确率（精确 / 归一化匹配）</span>
+        </div>
+        <div class="tabs" id="optTabs">
+          <div class="tab on">优化提示词</div>
+          <div class="tab">优化要素信息</div>
+        </div>
+        <div class="card card-pad" style="margin-bottom:16px">
+          <h3>回测准确率对比 <span class="hint">· 测试集 500 条分层抽样</span></h3>
+          <div class="acc-compare">
+            <div class="acc-box before"><div class="lbl">优化前（v3）</div><div class="num">86.0%</div><div style="font-size:11px;color:var(--muted)">错抽 28 · 漏抽 42</div></div>
+            <div class="acc-arrow">→</div>
+            <div class="acc-box after"><div class="lbl">优化后（v4）</div><div class="num">94.2%</div><div style="font-size:11px;color:var(--success)">↑ 8.2% · 错抽 9 · 漏抽 20</div></div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="card card-pad">
+            <h3>错误样本（驱动优化的种子）</h3>
+            <table class="err-table">
+              <thead><tr><th>抽取文本</th><th>实际输出</th><th>预期值</th></tr></thead>
+              <tbody id="opt-err-element">
+                <tr><td>…叁佰万元整…</td><td class="got">null</td><td class="exp">3,000,000元</td></tr>
+                <tr><td>…约300万…</td><td class="got">300</td><td class="exp">3,000,000元</td></tr>
+                <tr><td>…不含税1,000,000元…</td><td class="got">1,000,000元</td><td class="exp">1,000,000元(不含税)</td></tr>
+              </tbody>
+              <tbody id="opt-err-clause" style="display:none">
+                <tr><td>…第八章 违约责任 …</td><td class="got">未抽取（漏召）</td><td class="exp">整段条款</td></tr>
+                <tr><td>…应当支付违约金…</td><td class="got">边界越界</td><td class="exp">截至「争议解决」章前</td></tr>
+                <tr><td>…违约方应赔偿…</td><td class="got">仅取首句</td><td class="exp">完整 3 句</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card card-pad">
+            <h3>优化后提示词 <span class="tag green">v4</span></h3>
+            <div class="prompt-box">你是合同抽取专家。抽取「合同金额」：
+1. 触发词后取最近数值+币种
+2. 【新增】中文大写按位换算
+3. 【新增】"约/暂"保留约数标记
+4. 【新增】标注含税/不含税口径</div>
+            <div style="margin-top:12px"><button class="btn sm">查看优化说明</button> <button class="btn sm primary" style="float:right">采纳并保存 v4</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== DETAIL ===== -->
+      <section class="view" id="view-detail">
+        <div class="back-btn" onclick="go('library')">‹ 返回条款/要素库</div>
+        <div class="detail-head">
+          <div>
+            <div class="big" id="d-name">合同金额</div>
+            <div class="muted" style="margin-top:3px">数值型要素 · 5,230 条标注 · 当前 <b style="color:var(--primary)">v4</b> · 回测准确率 <b style="color:var(--success)">94.2%</b></div>
+          </div>
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn" onclick="go('insight')">查看测试集洞察</button>
+          <button class="btn" onclick="go('optimize')">前往优化</button>
+          <button class="btn primary" onclick="go('generate')">生成新版本</button>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <div class="card card-pad detail-field">
+              <div class="ft">◆ 定义</div>
+              <div class="body">合同标的的总价款金额。需区分含税与不含税口径，支持阿拉伯数字与中文大写、万元/亿元单位换算。</div>
+            </div>
+            <div class="card card-pad detail-field">
+              <div class="ft">◆ 抽取规则</div>
+              <div class="body"><ul>
+                <li>触发词：合同金额 / 总价 / 合同价款 / 暂估 / 暂定 + 数值</li>
+                <li>优先取「不含税金额」前缀，并标注是否含税</li>
+                <li>中文大写（叁佰万元整）按数位换算为阿拉伯数字</li>
+                <li>含「约 / 暂」修饰时保留约数标记</li>
+              </ul></div>
+            </div>
+            <div class="card card-pad detail-field">
+              <div class="ft">◆ 关键词 / 触发词</div>
+              <div class="body"><span class="kw">不含税</span><span class="kw">总价</span><span class="kw">合同价款</span><span class="kw">暂估</span><span class="kw">人民币</span></div>
+            </div>
+            <div class="card card-pad detail-field">
+              <div class="ft">◆ 示例</div>
+              <div class="body" style="font-size:12.5px">
+                <div style="margin-bottom:8px"><span class="tag green">正例</span> 「合同总金额为<b>人民币壹佰贰拾万元整</b>」 → 1,200,000元</div>
+                <div style="margin-bottom:8px"><span class="tag green">正例</span> 「不含税金额<b>1,000,000元</b>，税费另计」 → 1,000,000元(不含税)</div>
+                <div><span class="tag amber">边缘</span> 「价款<b>约300万</b>（以实际结算为准）」 → 约3,000,000元</div>
+              </div>
+            </div>
+            <div class="card card-pad detail-field">
+              <div class="ft">◆ 当前提示词（v4）</div>
+              <div class="prompt-box">你是合同抽取专家。抽取「合同金额」：
+1. 触发词后取最近数值 + 币种
+2. 中文大写按位换算为阿拉伯
+3. "约/暂" 修饰保留约数标记
+4. 标注含税 / 不含税口径
+输出 JSON：{"value":"","tax_inclusive":bool,"is_estimate":bool}</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card card-pad" style="margin-bottom:14px">
+              <h3>取值分布画像</h3>
+              <div class="donut-wrap">
+                <div class="donut" style="background:conic-gradient(var(--primary) 0 48%,var(--primary-2) 48% 75%,#fbbf24 75% 90%,#94a3b8 90% 100%)">
+                  <div class="center"><b>5,230</b><small>标注总量</small></div>
+                </div>
+                <div class="legend">
+                  <div class="li"><span class="sw" style="background:var(--primary)"></span>0 ~ 10万 · <b>48%</b></div>
+                  <div class="li"><span class="sw" style="background:var(--primary-2)"></span>10万 ~ 100万 · 27%</div>
+                  <div class="li"><span class="sw" style="background:#fbbf24"></span>100万 ~ 1亿 · 15%</div>
+                  <div class="li"><span class="sw" style="background:#94a3b8"></span>&gt; 1亿 · 10%</div>
+                </div>
+              </div>
+              <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.7">中位 ¥48万 · 均值 ¥312万 · 78% 为「X,XXX.XX元」格式 · 含税/不含税歧义率 4% · 1% 大写金额需特殊处理</div>
+            </div>
+
+            <div class="card card-pad" style="margin-bottom:14px">
+              <h3>准确率演进 <span class="hint">· 各版本回测</span></h3>
+              <div class="spark">
+                <div class="bar" style="height:38%"><span><b>62%</b>v1</span></div>
+                <div class="bar" style="height:56%"><span><b>78%</b>v2</span></div>
+                <div class="bar" style="height:72%"><span><b>86%</b>v3</span></div>
+                <div class="bar cur" style="height:84%"><span><b>94%</b>v4</span></div>
+              </div>
+            </div>
+
+            <div class="card card-pad">
+              <h3>版本历史 <span class="hint">· 可回滚到任意历史版本</span></h3>
+              <div class="vlist" id="vlist">
+                <div class="vitem current">
+                  <div class="vhead"><span class="vnum">v4</span><span class="tag green">当前</span><span class="vmeta">06-26 · 回测 94.2%</span></div>
+                  <div class="vnote">新增：中文大写换算、约数标记、含税口径</div>
+                </div>
+                <div class="vitem">
+                  <div class="vhead"><span class="vnum">v3</span><span class="vmeta">06-20 · 回测 86.0%</span></div>
+                  <div class="vnote">补充触发词「暂估 / 暂定」</div>
+                  <div style="margin-top:7px"><button class="mini-btn" onclick="rollback('v3',this)">回滚到此版本</button></div>
+                </div>
+                <div class="vitem">
+                  <div class="vhead"><span class="vnum">v2</span><span class="vmeta">06-12 · 回测 78.0%</span></div>
+                  <div class="vnote">首次接入语义去重后的标注数据</div>
+                  <div style="margin-top:7px"><button class="mini-btn" onclick="rollback('v2',this)">回滚到此版本</button></div>
+                </div>
+                <div class="vitem">
+                  <div class="vhead"><span class="vnum">v1</span><span class="tag gray">初版</span><span class="vmeta">06-05 · 回测 62.0%</span></div>
+                  <div class="vnote">基于标注数据自动生成</div>
+                  <div style="margin-top:7px"><button class="mini-btn" onclick="rollback('v1',this)">回滚到此版本</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== DESENS DOC ===== -->
+      <section class="view" id="view-desens-doc">
+        <div class="section-title">文档脱敏</div>
+        <div class="section-desc">按脱敏规则对整篇合同脱敏，导出为 PDF / DOCX，保留原排版。</div>
+        <div class="card card-pad" style="margin-bottom:16px">
+          <div class="row">
+            <div class="drop-zone" style="flex:1"><div class="ico">📄</div>点击或拖拽上传合同（PDF / DOCX / TXT）<div style="font-size:11px;margin-top:4px">已上传：采购合同_2024.pdf · 12 页</div></div>
+          </div>
+          <div class="row" style="margin-top:14px">
+            <span class="muted" style="font-size:12px">启用规则：</span>
+            <span class="tag green">手机号</span><span class="tag green">身份证</span><span class="tag green">银行卡</span><span class="tag green">人名</span><span class="tag green">公司名</span><span class="tag gray">金额（已关闭）</span>
+          </div>
+        </div>
+        <div class="doc-preview">
+          <div class="doc-pane">
+            <div class="ph">原文</div>
+            甲方：<span class="mask">华夏科技有限公司</span><br>
+            乙方：<span class="mask">东方建设集团股份有限公司</span><br>
+            联系人：<span class="mask">张伟</span>，电话：<span class="mask">13812345678</span><br>
+            身份证号：<span class="mask">110101199003071234</span><br>
+            合同金额为人民币 1,200,000 元整。
+          </div>
+          <div class="doc-pane">
+            <div class="ph">脱敏后</div>
+            甲方：<span class="masked">公司A</span><br>
+            乙方：<span class="masked">公司B</span><br>
+            联系人：<span class="masked">张**</span>，电话：<span class="masked">138****5678</span><br>
+            身份证号：<span class="masked">110**********1234</span><br>
+            合同金额为人民币 1,200,000 元整。
+          </div>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button class="btn">重新脱敏</button>
+          <div class="spacer" style="flex:1"></div>
+          <span class="muted" style="font-size:12px">导出格式：</span>
+          <button class="btn primary">⬇ 导出 PDF</button>
+          <button class="btn primary">⬇ 导出 DOCX</button>
+        </div>
+      </section>
+
+      <!-- ===== DESENS DATA ===== -->
+      <section class="view" id="view-desens-data">
+        <div class="section-title">标注数据脱敏</div>
+        <div class="section-desc">对标注值集合脱敏，前后对比并支持复制脱敏后结果，用于安全地共享/导出训练数据。</div>
+        <div class="card card-pad">
+          <div class="row" style="margin-bottom:14px">
+            <div class="upload" style="flex:1"><div class="fname">✓ 甲方_标注集.xlsx</div></div>
+            <button class="btn sm primary" onclick="copyText('公司A\n公司B\n公司C …',this)">📋 复制全部脱敏结果</button>
+            <button class="btn sm">⬇ 下载脱敏表</button>
+          </div>
+          <table class="ds-table">
+            <thead><tr><th style="width:40%">脱敏前</th><th>脱敏后</th><th style="width:90px">操作</th></tr></thead>
+            <tbody>
+              <tr><td class="before">华夏科技有限公司</td><td class="after">公司A</td><td><button class="mini-btn" onclick="copyText('公司A',this)">复制</button></td></tr>
+              <tr><td class="before">东方建设集团股份有限公司</td><td class="after">公司B</td><td><button class="mini-btn" onclick="copyText('公司B',this)">复制</button></td></tr>
+              <tr><td class="before">13812345678</td><td class="after">138****5678</td><td><button class="mini-btn" onclick="copyText('138****5678',this)">复制</button></td></tr>
+              <tr><td class="before">110101199003071234</td><td class="after">110**********1234</td><td><button class="mini-btn" onclick="copyText('110**********1234',this)">复制</button></td></tr>
+              <tr><td class="before">张伟 13812345678</td><td class="after">张** 138****5678</td><td><button class="mini-btn" onclick="copyText('张** 138****5678',this)">复制</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== COMPOSER ===== -->
+      <section class="view" id="view-composer">
+        <div class="section-title">提示词优化小模板</div>
+        <div class="section-desc">在左侧填入四项信息，右侧实时拼装可一键复制到外部模型优化的完整提示词。</div>
+        <div class="comp-layout">
+          <div class="card card-pad">
+            <div class="field"><label>① 当前提示词</label><textarea class="inp" id="cp-prompt" oninput="compose()" placeholder="粘贴你现在的抽取提示词…">你是合同抽取专家。抽取合同金额：取触发词后最近数值。</textarea></div>
+            <div class="field"><label>② 抽取文本</label><textarea class="inp" id="cp-text" oninput="compose()" placeholder="被抽取的原文片段…">…合同总金额为人民币大写：叁佰万元整…</textarea></div>
+            <div class="field"><label>③ 预期值（正确答案）</label><input class="inp" id="cp-exp" oninput="compose()" value="3,000,000元"></div>
+            <div class="field"><label>④ 问题现象</label><textarea class="inp" id="cp-issue" oninput="compose()" placeholder="实际发生了什么错误…">中文大写金额未被识别，返回 null。</textarea></div>
+          </div>
+          <div>
+            <div class="row" style="margin-bottom:12px;align-items:center">
+              <span class="muted" style="font-size:12px">模板：</span><span class="chip on">默认模板</span><span class="chip">少样本模板</span>
+              <div class="spacer" style="flex:1"></div>
+              <button class="btn primary" onclick="copyText(document.getElementById('compOut').innerText.replace(/▋/g,''),this)">📋 复制完整提示词</button>
+            </div>
+            <div class="comp-out" id="compOut"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SETTINGS ===== -->
+      <section class="view" id="view-settings">
+        <div class="section-title">设置</div>
+        <div class="section-desc">管理脱敏规则与 LLM 配置。</div>
+        <div class="card card-pad" style="margin-bottom:16px">
+          <h3>脱敏规则</h3>
+          <table class="set-table">
+            <thead><tr><th>规则名</th><th>类别</th><th>匹配</th><th>策略</th><th style="width:80px">启用</th></tr></thead>
+            <tbody>
+              <tr><td>手机号</td><td><span class="tag gray">内置</span></td><td><span class="mono">1[3-9]\d{9}</span></td><td>中间4位掩码</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
+              <tr><td>身份证号</td><td><span class="tag gray">内置</span></td><td><span class="mono">\d{17}[\dX]</span></td><td>保留首3尾4</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
+              <tr><td>银行卡号</td><td><span class="tag gray">内置</span></td><td><span class="mono">\d{16,19}</span></td><td>保留末4位</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
+              <tr><td>公司名称</td><td><span class="tag indigo">NER</span></td><td>实体识别</td><td>替换为公司A/B</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
+              <tr><td>人名</td><td><span class="tag indigo">NER</span></td><td>实体识别</td><td>保留姓 + **</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
+              <tr><td>合同金额</td><td><span class="tag amber">自定义</span></td><td><span class="mono">[\d,\.]+(元|万元)</span></td><td>完全掩码</td><td><div class="switch" onclick="this.classList.toggle('on')"></div></td></tr>
+            </tbody>
+          </table>
+          <button class="btn sm" style="margin-top:12px">+ 新建自定义规则</button>
+        </div>
+        <div class="card card-pad">
+          <h3>LLM 配置</h3>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px">
+            <div class="field"><label>Provider</label><input class="inp" value="GLM (智谱)"></div>
+            <div class="field"><label>模型</label><input class="inp" value="glm-5"></div>
+            <div class="field"><label>API Key</label><input class="inp" type="password" value="••••••••••••••••"></div>
+            <div class="field"><label>Embedding（语义去重）</label><input class="inp" value="embedding-3 (API 默认)"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer-note">💡 原型说明：所有数据为演示用样例。本页为静态交互原型，可点击左侧导航、页签、合并/拒绝、复制按钮、拼装输入框实时联动。</div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast">✓ 已复制到剪贴板</div>
+
+<script>
+const titles={library:["条款/要素库","/ 合同抽取辅助"],detail:["要素详情","/ 条款/要素库 / 详情"],insight:["测试集洞察","/ 合同金额"],generate:["辅助生成","/ 要素·条款"],optimize:["辅助优化","/ 要素·条款"],'desens-doc':["文档脱敏","/ 脱敏工具"],'desens-data':["数据脱敏","/ 脱敏工具"],composer:["提示词拼装","/ 辅助"],settings:["设置","/ 系统"]};
+function go(v){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
+  const t=titles[v]||["",""];document.getElementById('title').textContent=t[0];document.getElementById('crumb').textContent=t[1];
+  document.querySelector('.content').scrollTop=0;
+}
+document.getElementById('nav').addEventListener('click',e=>{const i=e.target.closest('.nav-item');if(i)go(i.dataset.view)});
+function tog(el){el.classList.toggle('on')}
+function setGenType(t){
+  const el=t==='element';
+  document.getElementById('t-element').classList.toggle('on',el);
+  document.getElementById('t-clause').classList.toggle('on',!el);
+  document.getElementById('fields-element').style.display=el?'grid':'none';
+  document.getElementById('fields-clause').style.display=el?'none':'grid';
+  document.getElementById('out-element').style.display=el?'block':'none';
+  document.getElementById('out-clause').style.display=el?'none':'block';
+}
+function setOptType(t){
+  const el=t==='element';
+  document.getElementById('ot-element').classList.toggle('on',el);
+  document.getElementById('ot-clause').classList.toggle('on',!el);
+  document.getElementById('opt-err-element').style.display=el?'':'none';
+  document.getElementById('opt-err-clause').style.display=el?'none':'';
+  document.getElementById('opt-metric').textContent=el
+    ?'回测指标：值匹配准确率（精确 / 归一化匹配）'
+    :'回测指标：条款召回率 + 边界准确率（+ 可选分类）';
+}
+function toast(msg){const t=document.getElementById('toast');t.innerHTML='✓ '+(msg||'已复制');t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1600)}
+function copyText(txt,btn){const v=(txt||'').trim();if(navigator.clipboard&&v){navigator.clipboard.writeText(v)}toast(btn?btn.innerText+' ✓':'已复制')}
+
+// insight tabs
+document.getElementById('insightTabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(!t)return;document.querySelectorAll('#insightTabs .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dist','pattern','kw'].forEach(k=>document.getElementById('tab-'+k).style.display=(k===t.dataset.t?'block':'none'))});
+
+function resolveDedup(btn,act){const item=btn.closest('.dedup-item');item.classList.add('merged');item.querySelectorAll('.mini-btn').forEach(b=>b.disabled=true);btn.style.fontWeight='700';toast(act==='merged'?'已合并分组':'已拒绝')}
+
+function genDemo(){
+  const type=document.getElementById('out-element').style.display==='none'?'clause':'element';
+  const blocks=Array.from(document.querySelectorAll('#out-'+type+' .gen-block'));
+  const head=document.querySelector('#genOut h3');
+  blocks.forEach(b=>{b.style.opacity='0';b.style.transition='opacity .35s,transform .35s';b.style.transform='translateY(6px)'});
+  head.innerHTML='生成结果 <span class="tag amber" style="margin-left:6px">生成中…</span>';
+  let i=0;
+  (function step(){
+    if(i<blocks.length){blocks[i].style.opacity='1';blocks[i].style.transform='none';toast('生成 '+(i+1)+'/'+blocks.length+' 段');i++;setTimeout(step,550);}
+    else{head.innerHTML='生成结果 <span class="tag green" style="margin-left:6px">完成</span>';toast('生成完成');}
+  })();
+}
+function openDetail(name){
+  document.getElementById('d-name').textContent=name;
+  go('detail');
+  document.getElementById('title').textContent=name;
+  document.getElementById('crumb').textContent='/ 条款/要素库 / 详情';
+}
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='dark'?'light':'dark';
+  if(next==='light'){document.documentElement.removeAttribute('data-theme')}else{document.documentElement.setAttribute('data-theme','dark')}
+  document.getElementById('themeBtn').textContent=next==='dark'?'☀️':'🌙';
+  try{sessionStorage.setItem('theme',next)}catch(e){}
+}
+function initTheme(){try{if(sessionStorage.getItem('theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('themeBtn').textContent='☀️'}}catch(e){}}
+function rollback(v,btn){
+  document.querySelectorAll('#vlist .vitem').forEach(it=>it.classList.remove('current'));
+  btn.closest('.vitem').classList.add('current');
+  toast('已回滚到 '+v+'（演示）');
+}
+function bindUploads(){
+  const inp=document.getElementById('fileInput');
+  document.querySelectorAll('.upload').forEach(u=>u.addEventListener('click',()=>{inp._target=u;inp.click()}));
+  inp.addEventListener('change',e=>{
+    const f=e.target.files[0];if(!f)return;const u=inp._target;if(!u)return;
+    u.classList.add('has-file');
+    const kb=Math.max(1,Math.round(f.size/1024));
+    u.innerHTML='<div style="font-weight:600">✓ '+f.name+'</div><div style="font-size:11px;margin-top:4px">'+kb+' KB · 已加载</div>';
+    toast('已加载文件：'+f.name);inp.value='';
+  });
+  const grid=document.querySelector('.lib-grid');
+  if(grid)grid.addEventListener('click',ev=>{const c=ev.target.closest('.el-card');if(!c)return;const n=c.querySelector('.ename');if(n)openDetail(n.textContent)});
+}
+
+// composer live
+function compose(){
+  const p=document.getElementById('cp-prompt').value.trim();
+  const t=document.getElementById('cp-text').value.trim();
+  const e=document.getElementById('cp-exp').value.trim();
+  const i=document.getElementById('cp-issue').value.trim();
+  const ph=(v,label)=>v?escapeHtml(v):'<span class="ph-empty">【'+label+' 待填】</span>';
+  document.getElementById('compOut').innerHTML=
+`请帮我优化下面这段【合同抽取提示词】。
+
+【当前提示词】
+${ph(p,'当前提示词')}
+
+【抽取文本】
+${ph(t,'抽取文本')}
+
+【预期值（正确答案）】
+${ph(e,'预期值')}
+
+【问题现象（实际发生了什么错误）】
+${ph(i,'问题现象')}
+
+请基于上述 case 优化提示词，输出：
+1. 优化后的完整提示词
+2. 优化点说明（针对问题现象改了什么、为什么）`;
+}
+function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+compose();
+bindUploads();initTheme();
+</script>
+</body>
+</html>
