@@ -159,7 +159,7 @@
         </div>
         <div class="clause-grid" id="clauseGrid">
           <!-- 采购 -->
-          <div class="cc" data-d="采购" data-k="付款支持文档 FSB0000004 付款"><div class="top"><div class="cn">付款支持文档</div><span class="tag indigo">采购</span></div><div class="cm">FSB0000004 · 1,240 标注 · v3</div><div class="stat"><span class="acc mid"><b>73%</b></span><span class="tag amber">待优化</span></div></div>
+          <div class="cc" data-d="采购" data-k="付款支持文档 FSB0000004 付款"><div class="top"><div class="cn">付款支持文档</div><span class="tag indigo">采购</span></div><div class="cm">FSB0000004 · 1,240 标注 · v3</div><div class="stat"><span class="acc mid"><b>73%</b></span><span class="faint" style="font-size:11px">v3 · ↓1.1</span></div></div>
           <div class="cc" data-d="采购" data-k="标的物 FSI0000007"><div class="top"><div class="cn">标的物</div><span class="tag indigo">采购</span></div><div class="cm">FSI0000007 · 4,712 标注 · v1</div><div class="stat"><span class="acc ok"><b>90%</b></span><span class="tag gray">初版</span></div></div>
           <div class="cc" data-d="采购" data-k="合同金额 FSI0000003 金额"><div class="top"><div class="cn">合同金额</div><span class="tag indigo">采购</span></div><div class="cm">FSI0000003 · 5,230 标注 · v4</div><div class="stat"><span class="acc ok"><b>94%</b></span><span class="tag green">已优化</span></div></div>
           <!-- 销售 -->
@@ -226,17 +226,18 @@
         <div class="section-title">质量与风险大盘</div>
         <div class="section-desc">给业务负责人 / 数据专家看：健不健康、风险在哪、优化值不值、瓶颈在哪层。</div>
         <div class="source-note">🔗 <b>数据来源：</b>准确率/badcase 来自<b>平台跑批结果（导入）</b>；归因 / 收益 / 回归 / 版本diff 由<b>本工具计算</b>。规则生成与抽取是两套系统，靠导入桥接。</div>
+        <div class="callout teal" style="margin-top:0;margin-bottom:14px">⚖️ <b>本工具不预设"优良中差"分级</b>——任何分类阈值（如"待优化线""风险线"）必须由业务领导定义并检验后才上线；下图仅展示<b>事实数据</b>（准确率/趋势/归因占比）与<b>事实排序</b>（最低/下降最多），不做主观评级。</div>
 
         <div class="kpi-row">
           <div class="kpi accent"><div class="k">整体抽取准确率</div><div class="v">88.4<small>%</small> <small style="font-size:13px">↑1.2</small></div></div>
-          <div class="kpi"><div class="k">条款健康度</div><div class="v" style="font-size:15px;padding-top:4px"><span class="rg"><span class="d" style="background:var(--success)"></span>良 12</span><span class="rg"><span class="d" style="background:var(--warn)"></span>中 5</span><span class="rg"><span class="d" style="background:var(--danger)"></span>差 2</span></div></div>
+          <div class="kpi"><div class="k">在管条款总数</div><div class="v">19<small> 个</small></div></div>
           <div class="kpi"><div class="k">本周优化净收益</div><div class="v" style="color:var(--success)">+44<small> badcase</small></div></div>
           <div class="kpi"><div class="k">回归守护</div><div class="v" style="color:var(--success)">0<small> 条款被改坏</small></div></div>
         </div>
 
         <div class="two-col">
           <div class="card card-pad">
-            <h3>风险条款 TOP <span class="hint">· 点"立即优化"直达工作页</span></h3>
+            <h3>重点关注 · 准确率最低 / 下降最多 <span class="hint">· 事实排序（非评级），点"立即优化"直达工作页</span></h3>
             <div class="risk-row low"><span class="rv">68%</span><div class="rn">违约金 <span class="tag red">↓3.2</span> <span class="tag purple">销售</span></div><button class="btn sm primary" onclick="openDetail('违约金')">立即优化</button></div>
             <div class="risk-row low"><span class="rv">71%</span><div class="rn">付款里程碑 <span class="tag red">↓2.1</span> <span class="tag amber">工程</span></div><button class="btn sm primary" onclick="openDetail('付款里程碑')">立即优化</button></div>
             <div class="risk-row mid"><span class="rv">73%</span><div class="rn">付款支持文档 <span class="tag amber">↓1.1</span> <span class="tag indigo">采购</span></div><button class="btn sm primary" onclick="openDetail('付款支持文档')">立即优化</button></div>
