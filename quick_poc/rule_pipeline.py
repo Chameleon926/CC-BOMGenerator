@@ -219,6 +219,16 @@ def run_pipeline(client, data, mode):
     }
     if mode == "optimize":
         final["diagnosis"] = s1.get("diagnosis", [])
+
+    print(f"\n=== [{mode}] Stage 3：规则自检（提前抓矛盾/过拟合/漏覆盖）===")
+    negatives = [c for c in (data.get("badcases") or []) if c.get("type") == "false_positive"] if mode == "optimize" else []
+    verify_user = render(load_prompt("verify"),
+                         bom_json=json.dumps(final, ensure_ascii=False, indent=2),
+                         positives=fmt_cands(data.get("positive_candidates")),
+                         negatives=(fmt_badcases_rich(negatives) if negatives else "（无）"))
+    s3, _ = call(client, [{"role": "system", "content": SYS}, {"role": "user", "content": verify_user}], 0.0)
+    print(json.dumps(s3, ensure_ascii=False, indent=2))
+    final["verification"] = s3
     return final
 
 
@@ -250,6 +260,17 @@ def render_readable(bom):
             L += [f"- {d.get('case_id', '')}（{d.get('case_type', '')}）[{d.get('category', '')}]" + (f" →修{tgt}" if tgt else ""),
                   f"    根因：{d.get('reason', '')}",
                   f"    建议修法：{d.get('suggested_fix', '')}"]
+    v = bom.get("verification")
+    if v:
+        L.append("\n【规则自检】")
+        L.append(f"结论：{v.get('summary', '')}")
+        L.append(f"覆盖估计：{v.get('coverage_estimate', '')}")
+        rf = v.get("red_flags") or []
+        if rf:
+            L.append("🚩 红旗（建议修复）：")
+            L += [f"  - {r}" for r in rf]
+        else:
+            L.append("✓ 无红旗")
     return "\n".join(L)
 
 
@@ -302,16 +323,23 @@ def print_prompts(data, mode, data_path):
     s2 = render(load_prompt("gen_stage2" if mode == "generate" else "opt_stage2"),
                 stage1_json="\n<<< 把 Stage 1 返回的 JSON 粘贴到这里 >>>\n",
                 cands=fmt_cands(data.get("positive_candidates")), **recall_params(data))
+    s3 = render(load_prompt("verify"),
+                bom_json="\n<<< 把 Stage1+Stage2 合并后的完整 BOM JSON 粘贴到这里（第④步合并后再跑这步）>>>\n",
+                positives=fmt_cands(data.get("positive_candidates")),
+                negatives="（optimize：把误抽反例粘这里；generate：填'无'）")
     bar = "=" * 64
     print(f"\n{bar}\n【Stage 1 提示词：语义定义+抽取规则】复制到外网模型，拿回 JSON\n{bar}\n")
     print(s1)
     print(f"\n{bar}\n【Stage 2 提示词：召回画像】先把 Stage 1 的 JSON 粘到 <<<>>> 处，再发给模型\n{bar}\n")
     print(s2)
+    print(f"\n{bar}\n【Stage 3 提示词：规则自检（可选，推荐）】把合并后的完整 BOM 粘到 <<<>>> 处，发给模型查矛盾\n{bar}\n")
+    print(s3)
     out_dir = Path(__file__).parent / "output"
     out_dir.mkdir(exist_ok=True)
     f = out_dir / f"{data_path.stem}_prompts.txt"
-    f.write_text(f"===== Stage 1 提示词 =====\n{s1}\n\n===== Stage 2 提示词 =====\n{s2}\n", encoding="utf-8")
-    print(f"\n✓ 两段提示词已存：{f}（方便整体复制）\n")
+    f.write_text(f"===== Stage 1 提示词 =====\n{s1}\n\n===== Stage 2 提示词 =====\n{s2}\n\n"
+                 f"===== Stage 3 提示词（自检，可选）=====\n{s3}\n", encoding="utf-8")
+    print(f"\n✓ 三段提示词已存：{f}（方便整体复制）\n")
 
 
 def run_one(client, data_path, mode_override, use_api):

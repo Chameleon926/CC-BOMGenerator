@@ -1,64 +1,125 @@
-# quick_poc · 规则编排智能体（PoC）
+# 合同条款规则生成小工具（业务使用说明）
 
-> Excel + 选模式 → 提示词 → 外网大模型 → 业务可读 BOM。
-> PoC **默认只生成提示词**（不调 API），用户复制到外网模型跑。
+> **一句话**：把你的合同测试集（Excel）丢进来，自动生成「条款定义 + 抽取规则 + 召回画像」，你抄进新平台就能用。**不懂代码也能操作。**
 
-## 完整流程（业务照着做）
+---
 
-**① 选 Excel + 模式 → 生成提示词**
-```bash
-python quick_poc/run_excel.py 初始测试集.xlsx --mode generate   # 场景①：只有期望值，生成首版 BOM
-python quick_poc/run_excel.py 跑批结果.xlsx   --mode optimize   # 场景②：有实际值/是否匹配，优化
-```
-控制台逐条款打印每一步：**候选去重（去掉哪些/组装多少）→ badcase 数 → Stage1/Stage2 提示词**；提示词也存到 `output/<条款>_prompts.txt`。
+## 一、它能帮你做什么
 
-**② 跑 Stage1**：把 `output/<条款>_prompts.txt` 里的 **Stage1 提示词**复制到外网模型（Gemini/Claude/ChatGPT）→ 把返回 JSON 存为 `stage1.json`。
+你平时要手写每个条款的"业务定义、抽取规则、关键词"——很烦、还容易写偏。
+这个小工具：你给它一个 Excel 测试集，它帮你**自动生成**这套配置，而且是**业务能看懂的格式**（不是一堆代码）。
 
-**③ 跑 Stage2**：把 Stage1 的 JSON 粘到 **Stage2 提示词**的 `<<<>>>` 占位处 → 发给模型 → 返回存为 `stage2.json`。
+---
 
-**④ 合并成业务可读 BOM**
-```bash
-python quick_poc/rule_pipeline.py --combine quick_poc/data/imported/<条款>.yaml stage1.json stage2.json
-```
-→ `output/<条款>_BOM_readable.md`：**业务定义 / 抽取规则(拦截+匹配) / 召回画像(关键词·易混淆·章节·语义查询·正例) / Badcase诊断**，业务直接看懂、配进平台。
+## 二、你要准备什么
 
-## 两个模式
+一个 **Excel 表格**（`.xlsx` 或 `.csv` 都行），至少要有这几列（**列名中英文都认**）：
 
-| `--mode` | 输入 Excel | 产出 |
-|---|---|---|
-| `generate` | 只有期望值 | 首版 BOM（定义+规则+画像） |
-| `optimize` | 期望值 + 实际值 + 是否匹配（+ 可选 trace） | 优化后 BOM + Badcase 归因诊断 |
-
-`run_excel` 自动按列识别：有"是否匹配/实际值"列 → optimize 圈出 `是否匹配=否` 为 badcase；否则 generate。
-
-## Trace 字段选择（optimize，可选）
-
-trace 很长，按需在 yaml 里 `trace_fields` 选要哪些（默认全要），省 token：
-```yaml
-trace_fields: [reasoning, context_window]   # 只带这两个进提示词
-```
-可选：`current_rules`（当前规则/画像）、`context_window`（合同原文窗口）、`model_extracted`（模型抽取）、`reasoning`（推理）、`chunks`（可用chunk）。
-> trace 由 `trace_input`/`trace_output` 两 txt 提供；`run_excel` 生成的 yaml 无 trace，需要时手动补（覆盖率缺口诊断才准）。
-
-## 去重（自动）
-
-组装前对候选期望值做近义去重（`difflib`，防 49/50 重复淹没+爆 token），控制台打印"去掉哪些/组装多少条"。yaml `dedup_threshold`（默认 0.8）可调。
-
-## 想自动调模型（可选）
-
-PoC 默认出提示词。要自动调：填 `config/llm.yaml`（`cp config/llm.example.yaml config/llm.yaml`），再加 `--api`：
-```bash
-python quick_poc/run_excel.py 测试集.xlsx --mode optimize --api
-```
-
-## 文件说明
-
-| 文件 | 作用 |
+| 要填的 | 中文列名（或英文） |
 |---|---|
-| `run_excel.py` | **主入口**：Excel + 模式 → 提示词（一步到位） |
-| `rule_pipeline.py` | 引擎：yaml→提示词/调模型；`--combine` 合并结果为可读 BOM |
-| `import_excel.py` | 仅 Excel→yaml（不跑） |
-| `trace_parser.py` | trace 解析（txt，输入/输出两文件，错误报行号） |
-| `dedup.py` | 近义去重 |
-| `prompts/` | 所有提示词（纯文本+`{{var}}`占位，改它不改代码） |
-| `config/llm.yaml` | 模型配置（api_key/base_url/model） |
+| 条款编码 | 语义块编码 / `block_code` |
+| 条款名称 | 语义块名称 / `block_name` |
+| **期望值**（最关键） | 期望值 / `expected_value` |
+
+> 如果是**跑过一版的结果**，再多两列：`实际值`（抽取值）、`是否匹配`。
+
+---
+
+## 三、两种模式，选一个
+
+| 你的情况 | 用哪个模式 | 它干什么 |
+|---|---|---|
+| **新条款，还没跑过**（只有期望值） | `generate`（初始生成） | 凭期望值生成首版 定义+规则+画像 |
+| **已经跑过一版，有错例**（有实际值/是否匹配） | `optimize`（优化） | 分析错例，生成更准的 定义+规则+画像 |
+
+---
+
+## 四、傻瓜式三步（不用装代码环境也能用「提示词模式」）
+
+### 第 1 步：把 Excel 变成「提示词」
+
+打开命令行（PyCharm 里的 Terminal 就行），cd 到项目目录，敲：
+
+```bash
+python quick_poc/run_excel.py 你的测试集.xlsx --mode generate
+```
+（优化模式把 `generate` 换成 `optimize`）
+
+**你会看到**：屏幕上一条条打印每个条款的处理过程（去掉了哪些重复、用了几条），最后给出**两段提示词**（也存成了文件 `quick_poc/output/某条款_prompts.txt`）。
+
+### 第 2 步：复制提示词，去 AI 网站跑
+
+1. 打开 `quick_poc/output/某条款_prompts.txt`。
+2. 把 **Stage 1 提示词** 整段复制 → 粘贴到 Gemini / ChatGPT / Claude → 把它的回答**存成 `stage1.json`**。
+3. 把 **Stage 2 提示词** 里 `<<<...>>>` 那一段，换成你刚拿到的 Stage 1 回答 → 再粘给 AI → 回答**存成 `stage2.json`**。
+
+> （可选）再把 **Stage 3 自检提示词** 跑一遍，AI 会告诉你"这套规则有没有自相矛盾/会不会漏抽"。
+
+### 第 3 步：合并成「业务能看懂的配置」
+
+```bash
+python quick_poc/rule_pipeline.py --combine quick_poc/data/imported/某条款.yaml stage1.json stage2.json
+```
+
+**你会得到** `quick_poc/output/某条款_BOM_readable.md`，长这样（直接能看懂、抄进平台）：
+
+```
+【条款】付款支持文档（FSB0000004）
+
+【业务定义】
+【包含】……；【不含】……（边界）
+
+【抽取规则】
+🛑 绝对拦截规则（命中就放弃，防误抽）：
+  1. …… —— 针对哪类误抽
+✅ 核心匹配规则（满足就提取，防漏抽）：
+  1. …… —— 覆盖哪类正例
+
+【召回画像】
+- 正向关键词：付款支持文档, 增值税发票, PO, ……
+- 易混淆词：支付方式, 付款日, ……
+- 章节提示：付款条款, 支付与结算, ……
+- 语义查询：……
+- 正例参考：……
+
+【规则自检】结论：…… / 红旗：……
+```
+
+把这个文件里的内容，照着抄进新平台的「BOM 定义」页面即可。
+
+---
+
+## 五、想偷懒，让工具自动调 AI（可选）
+
+上面第 2 步要手动复制粘贴。如果你想**全自动**：
+1. 填模型配置：把 `config/llm.example.yaml` 复制成 `config/llm.yaml`，填你的 `api_key` / `model`。
+2. 命令加 `--api`：
+```bash
+python quick_poc/run_excel.py 你的测试集.xlsx --mode optimize --api
+```
+工具会自己调 AI、自己跑三阶段、自己生成可读 BOM。**PoC 阶段默认是手动模式**（更省钱、更可控）。
+
+---
+
+## 六、常见问题
+
+**Q：提示词太长 / AI 报超长？**
+A：工具会自动把测试集里**高度相似的期望值去重**（屏幕会打印"去掉 N 条重复"），已经帮你想到了。如果还长，检查 Excel 是不是同一个条款粘了太多几乎一样的行。
+
+**Q：optimize 模式想用 trace？**
+A：trace 很长，工具只挑有效字段。在生成的 `某条款.yaml` 里给错例补上 `trace_input`/`trace_output`（两个 txt 文件），并用 `trace_fields` 选要哪几个字段。
+
+**Q：关键词生成得太长/带具体金额？**
+A：工具会**自动过滤**掉含数字、太长、像整句的关键词（防"换个合同就匹配不上"）。已自动处理。
+
+**Q：怎么知道生成的规则靠不靠谱？**
+A：跑一下 **Stage 3 自检**（或加 `--api` 自动跑）。它会标出"红旗"：比如某条拦截规则会把本该抽的内容删掉、或规则写死了某公司名（换合同就废）。
+
+---
+
+## 七、给 IT/同事的技术说明（业务可跳过）
+
+- 阶段顺序（与平台一致）：**Stage1 定义+规则 → Stage2 召回画像(派生) → Stage3 自检**。
+- 所有提示词在 `prompts/`（XML 结构 + 各阶段角色），改提示词不改代码。
+- 模型配置在 `config/llm.yaml`（密钥不入库）；按阶段分温度（Stage1 收敛 0.2 / Stage2 发散 0.5 / 自检 0）。
+- 文件：`run_excel.py`(主入口) / `rule_pipeline.py`(引擎, --combine) / `import_excel.py`(仅导入) / `trace_parser.py` / `dedup.py`。
