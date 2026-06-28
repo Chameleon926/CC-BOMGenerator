@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC-BOMGenerator · 技术设计文档</title>
+<style>
+  :root{--primary:#4f46e5;--primary-dark:#4338ca;--primary-light:#eef2ff;--ink:#0f172a;--ink-2:#334155;--muted:#64748b;--muted-2:#94a3b8;--line:#e6e8ee;--bg:#fff;--surface:#f8fafc;--surface-2:#f1f5f9;--green:#059669;--green-bg:#ecfdf5;--red:#dc2626;--red-bg:#fef2f2;--amber:#d97706;--amber-bg:#fffbeb;--blue:#2563eb;--blue-bg:#eff6ff;--purple:#7c3aed;--purple-bg:#f5f3ff;--teal:#0d9488;--teal-bg:#f0fdfa;--shadow:0 1px 3px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);--radius:14px;--radius-sm:9px}
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;font-size:15px}
+  .layout{display:flex;align-items:flex-start;justify-content:center}
+  .toc{width:250px;position:sticky;top:0;align-self:flex-start;height:100vh;overflow-y:auto;padding:36px 18px 60px 40px;border-right:1px solid var(--line);font-size:13px;flex-shrink:0}
+  .toc .brand{font-weight:700;font-size:14px;margin-bottom:4px}.toc .brand-sub{font-size:11px;color:var(--muted-2);margin-bottom:22px}
+  .toc h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2);margin:18px 0 8px;font-weight:600}
+  .toc ol{list-style:none;padding:0;margin:0}.toc ol li{margin:1px 0}.toc ol li a{color:var(--ink-2);display:block;padding:5px 10px;border-radius:7px;transition:.12s}.toc ol li a:hover{background:var(--surface);color:var(--primary)}
+  .content{flex:0 1 900px;min-width:0;padding:0 64px 140px;max-width:900px}
+  .hero{padding:60px 0 38px;border-bottom:1px solid var(--line);margin-bottom:42px}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--primary);background:var(--primary-light);padding:6px 13px;border-radius:999px;margin-bottom:20px}
+  h1.title{font-size:36px;line-height:1.18;letter-spacing:-.025em;margin:0 0 14px;font-weight:800}
+  .subtitle{font-size:16px;color:var(--muted);max-width:640px;margin:0 0 24px}
+  .meta{display:flex;flex-wrap:wrap;gap:10px}.meta .chip{font-size:12.5px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);padding:6px 12px;border-radius:8px}.meta .chip b{color:var(--muted);font-weight:500;margin-right:6px}
+  section{margin-bottom:50px;scroll-margin-top:20px}
+  h2{font-size:23px;letter-spacing:-.02em;margin:0 0 6px;font-weight:750;display:flex;align-items:center;gap:12px}
+  h2 .num{font-size:12.5px;font-weight:700;color:#fff;background:var(--ink);width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+  .sec-lead{color:var(--muted);font-size:14.5px;margin:0 0 20px;padding-left:42px}
+  h3{font-size:17px;margin:28px 0 11px;font-weight:680;letter-spacing:-.01em}
+  h4{font-size:14.5px;margin:18px 0 8px;font-weight:650;color:var(--ink-2)}
+  p{margin:0 0 13px} ul,ol{padding-left:22px;margin:0 0 14px} li{margin:6px 0}
+  strong{font-weight:650} code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12.5px;background:var(--surface-2);padding:2px 6px;border-radius:5px;color:var(--primary-dark)}
+  .callout{border-radius:var(--radius);padding:14px 17px;margin:14px 0;border:1px solid;position:relative}
+  .callout.info{background:var(--blue-bg);border-color:#dbeafe}.callout.warn{background:var(--amber-bg);border-color:#fde68a}.callout.success{background:var(--green-bg);border-color:#a7f3d0}.callout .t{font-weight:680;margin-bottom:4px;font-size:13.5px}.callout p:last-child{margin-bottom:0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+  th,td{padding:10px 13px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top} th{background:var(--surface-2);font-weight:650;color:var(--ink-2);font-size:12px} tr:last-child td{border-bottom:0} td code{font-size:11.5px}
+  .schema{background:#0f172a;color:#e2e8f0;border-radius:var(--radius-sm);padding:14px 16px;font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;margin:12px 0;overflow-x:auto}
+  .schema .k{color:#7dd3fc}.schema .s{color:#86efac}.schema .c{color:#64748b}
+  .cred{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px}
+  .cred.g{background:var(--green-bg);color:var(--green)}.cred.y{background:var(--amber-bg);color:var(--amber)}.cred.r{background:var(--red-bg);color:var(--red)}
+  .node{display:inline-block;border:1px solid var(--primary);background:var(--primary-light);color:var(--primary-dark);padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;margin:3px}
+  .flow-box{border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:var(--radius-sm);background:var(--surface);padding:13px 16px;margin:10px 0}
+  .flow-box .ft{font-weight:650;font-size:13px;margin-bottom:4px}.flow-box p{margin:0;font-size:12.5px;color:var(--muted)}
+  footer.foot{margin-top:50px;padding-top:22px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted-2);display:flex;justify-content:space-between}
+  @media(max-width:1000px){.toc{display:none}.content{padding:0 28px 100px;flex-basis:100%}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc">
+  <div class="brand">CC-BOMGenerator</div><div class="brand-sub">技术设计文档</div>
+  <h4>文档</h4>
+  <ol>
+    <li><a href="#overview">1 · 系统总览</a></li>
+    <li><a href="#arch">2 · 总体架构</a></li>
+    <li><a href="#contract">3 · 节点契约</a></li>
+    <li><a href="#data">4 · 数据模型</a></li>
+    <li><a href="#flow">5 · 数据流与解耦</a></li>
+    <li><a href="#stage">6 · 三阶段流程</a></li>
+    <li><a href="#recall">7 · 召回画像生成</a></li>
+    <li><a href="#diag">8 · 诊断与自检</a></li>
+    <li><a href="#desens">9 · 脱敏引擎</a></li>
+    <li><a href="#version">10 · 版本/收益/回归</a></li>
+    <li><a href="#dashboard">11 · 大盘指标逻辑</a></li>
+    <li><a href="#stack">12 · 技术栈选型</a></li>
+    <li><a href="#dir">13 · 目录结构</a></li>
+    <li><a href="#phase">14 · 分期路线</a></li>
+    <li><a href="#config">15 · 配置体系</a></li>
+    <li><a href="#nonfunc">16 · 非功能</a></li>
+  </ol>
+</nav>
+<main class="content">
+<header class="hero">
+  <span class="eyebrow">技术设计文档 · Technical Design</span>
+  <h1 class="title">语义 BOM 规则编译器<br>技术设计规范</h1>
+  <p class="subtitle">面向实现的完整设计：节点架构、契约 schema、MySQL 数据模型、数据流、各模块算法逻辑、技术栈与分期。开发照此落地，业务/评审照此对齐。</p>
+  <div class="meta"><span class="chip"><b>版本</b>V0.1</span><span class="chip"><b>日期</b>2026-06-28</span><span class="chip"><b>形态</b>Python · Streamlit · MySQL</span><span class="chip"><b>解耦</b>独立于抽取平台</span></div>
+</header>
+
+<section id="overview">
+  <h2><span class="num">01</span>系统总览</h2>
+  <p class="sec-lead">一句话：从测试集生成/优化"语义BOM"（定义+规则+召回画像），版本化管理，对导入的跑批结果做归因与收益分析。与抽取平台<strong>解耦</strong>，靠 Excel 导入导出桥接。</p>
+  <h3>1.1 边界</h3>
+  <table>
+    <tr><th style="width:30%">本工具负责</th><th>抽取平台负责（不在本项目）</th></tr>
+    <tr><td>BOM 生成/优化、诊断归因、版本管理、脱敏、大盘分析</td><td>文档解析、召回、抽取、跑分（产出准确率/badcase）</td></tr>
+  </table>
+  <h3>1.2 设计目标</h3>
+  <ul>
+    <li><strong>解耦</strong>：不直连平台，通过导入导出同步，降低耦合与合规风险。</li>
+    <li><strong>契约先行</strong>：每个节点输入输出 Pydantic 固定，可独立测试、可并行开发。</li>
+    <li><strong>可信度分层</strong>：事实/计算(🟢)直接示人；AI 生成(🟡)必标"待复核"；阈值分级(🔴)待领导定。</li>
+    <li><strong>配置外置</strong>：提示词、模型、脱敏规则全在文件，代码零硬编码。</li>
+  </ul>
+</section>
+
+<section id="arch">
+  <h2><span class="num">02</span>总体架构（节点 skill 流水线）</h2>
+  <p class="sec-lead">每个节点是一个有输入输出契约的 skill，可独立测试、可替换。未来对接平台时，对接点=节点边界。</p>
+  <p>
+    <span class="node">ingest 数据加载</span>→<span class="node">anonymize 脱敏</span>→<span class="node">generate 生成(Stage1+2)</span>→<span class="node">diagnose 诊断</span>→<span class="node">optimize 优化</span>→<span class="node">verify 自检(Stage3)</span>→<span class="node">apply 版本化</span>→<span class="node">evaluate 大盘</span>
+  </p>
+  <h3>2.1 三套配置页签（对齐新平台）</h3>
+  <table>
+    <tr><th>页签</th><th>内容</th><th>位置</th></tr>
+    <tr><td>模型配置</td><td>provider/model/api_key/base_url/<strong>分阶段温度</strong></td><td>config/llm.yaml</td></tr>
+    <tr><td>提示词模板</td><td>Stage1/2/3、generate/optimize 模板（可编辑）</td><td>prompts/*.txt</td></tr>
+    <tr><td>skill 配置</td><td>节点开关、去重阈值、画像数量、脱敏规则、trace_fields</td><td>yaml/设置</td></tr>
+  </table>
+</section>
+
+<section id="contract">
+  <h2><span class="num">03</span>节点契约（Pydantic schema）</h2>
+  <p class="sec-lead">契约是协作边界。A 实现 generate、B 实现 diagnose，彼此只看对方契约。改契约=开 PR。下列为核心契约（开发第一步即落地 <code>src/cc_bom_generator/contracts/</code>）。</p>
+
+  <h3>3.1 TestSet（数据加载输出）</h3>
+  <div class="schema"><span class="c"># 一个文档 → 多语义块 → 多语义项 + 上下文</span>
+TestSet:
+  documents: List[<span class="k">Document</span>]
+Document:
+  doc_id: str
+  doc_name: str
+  blocks: List[<span class="k">Block</span>]
+Block:
+  block_code: str          <span class="c"># 语义块编码（父）</span>
+  block_name: str
+  context: str             <span class="c"># 上下文(条款期望值 或 chunk)</span>
+  items: List[<span class="k">Item</span>]      <span class="c"># 语义项（子），可空</span>
+Item:
+  item_code: str
+  item_name: str
+  expected: str            <span class="c"># 期望值，空=负例</span></div>
+
+  <h3>3.2 BOM（生成/优化产物，版本化存储）</h3>
+  <div class="schema">BOM:
+  clause: str
+  block_code: str
+  version: int
+  semantic_definition: str            <span class="c"># 含【包含】【不含】边界</span>
+  extraction_rules: <span class="k">ExtractionRules</span>
+  recall_profile: <span class="k">RecallProfile</span>
+ExtractionRules:
+  absolute_interception_rules: List[{rule:str, fixes:str}]   <span class="c"># 针对误抽</span>
+  core_match_rules: List[{rule:str, fixes:str}]              <span class="c"># 针对漏抽</span>
+RecallProfile:
+  positive_keywords: List[str]    <span class="c"># 短词,程序过滤</span>
+  confusion_words: List[str]
+  section_hints: List[str]
+  semantic_queries: List[str]     <span class="c"># 定义改写,向量召回</span>
+  positive_examples: List[str]    <span class="c"># 多样性挑选</span></div>
+
+  <h3>3.3 Diagnosis / Verification（诊断与自检）</h3>
+  <div class="schema">Diagnosis:                        <span class="c"># 🟡 AI 归因</span>
+  case_id: str
+  case_type: <span class="s">"miss"|"false_positive"</span>
+  category: <span class="s">"召回|混合|BOM|Prompt模板|推理"</span>
+  reason: str
+  suggested_fix: str
+  fix_target: <span class="s">"rules"|"recall_profile"|"both"</span>   <span class="c"># 路由到Stage2</span>
+Verification:                     <span class="c"># 🟡 Stage3 自检</span>
+  checks: List[{item:str, verdict:<span class="s">"pass|warn|fail"</span>, reason:str}]
+  red_flags: List[str]
+  coverage_estimate: str          <span class="c"># 如 5/6≈83%</span>
+  summary: str</div>
+
+  <h3>3.4 RunResult / Metrics（平台导入 + 本工具计算）</h3>
+  <div class="schema">RunResult:                       <span class="c"># 🟢 平台跑批导入</span>
+  block_code: str; version: int
+  accuracy: float; miss: int; false_positive: int
+  badcases: List[<span class="k">Badcase</span>]
+OptGain:                         <span class="c"># 🟢 本工具算</span>
+  fixed: int; regressed: int; net: int
+  regression_guard: List[str]    <span class="c"># 被改坏的其他条款</span></div>
+</section>
+
+<section id="data">
+  <h2><span class="num">04</span>数据模型（MySQL + JSON 列）</h2>
+  <p class="sec-lead">结构化元数据用关系表；BOM/trace 等嵌套结构用 JSON 列。schema 由 SQLAlchemy + Alembic 管理，变更提交 git，各人 <code>alembic upgrade head</code> 同步。</p>
+  <table>
+    <tr><th>表</th><th>关键字段</th><th>说明</th></tr>
+    <tr><td><code>clause</code></td><td>block_code(PK), block_name, domain, current_version</td><td>条款注册（采购/销售/服务…）</td></tr>
+    <tr><td><code>bom_version</code></td><td>id, block_code, version, <strong>bom_json(JSON)</strong>, parent_version, source(generate/optimize), created_by, created_at</td><td>每版 BOM 快照（不可变）</td></tr>
+    <tr><td><code>testset</code></td><td>id, block_code, kind(initial/run_result), data_json, imported_at</td><td>测试集/跑批原始数据</td></tr>
+    <tr><td><code>run_result</code></td><td>id, block_code, version, accuracy, miss, false_positive, imported_at</td><td>🟢 平台导入的跑分</td></tr>
+    <tr><td><code>badcase</code></td><td>id, block_code, version, doc_id, type, expected, actual, similarity</td><td>错例（是否匹配=否）</td></tr>
+    <tr><td><code>diagnosis</code></td><td>id, badcase_id(FK), category, reason, suggested_fix, fix_target</td><td>🟡 AI 归因结果</td></tr>
+    <tr><td><code>optimization_log</code></td><td>id, block_code, from_ver, to_ver, fixed, regressed, net, operator, created_at</td><td>🟢 优化收益记录</td></tr>
+    <tr><td><code>trace</code></td><td>id, badcase_id(FK), trace_json, parsed_json</td><td>trace 原文+解析后</td></tr>
+    <tr><td><code>chat_session/message</code></td><td>—</td><td>对话（Phase 2）</td></tr>
+  </table>
+  <div class="callout info"><div class="t">字符集</div><p>库与表统一 <code>utf8mb4 / utf8mb4_unicode_ci</code>（合同全中文）。JSON 列用 MySQL 原生 JSON 类型存嵌套 BOM。</p></div>
+</section>
+
+<section id="flow">
+  <h2><span class="num">05</span>数据流与解耦（导入导出桥接）</h2>
+  <p class="sec-lead">规则生成与抽取是两套系统。本工具是"分析+版本+大盘"层，原料（准确率/badcase）由平台导出后导入。</p>
+  <div class="flow-box"><div class="ft">① generate（初始）</div><p>初始测试集(期望值) → ingest → [脱敏] → generate(三阶段) → BOM v1 → <strong>导出</strong>给平台配置</p></div>
+  <div class="flow-box"><div class="ft">② optimize（已跑）</div><p>平台跑批 → <strong>导出 Excel</strong>(期望/实际/是否匹配) → 导入 run_result+badcase → diagnose(吃trace) → optimize → BOM v2 → 导出</p></div>
+  <div class="flow-box"><div class="ft">③ evaluate（大盘）</div><p>多版本 run_result 导入 → 算 修复/回归/净收益/归因占比 → 大盘展示 → 驱动下一轮</p></div>
+  <div class="callout warn"><div class="t">关键约束</div><p>没有"导入的跑批结果"就算不出收益/回归/准确率趋势——这些指标强依赖平台导出。</p></div>
+</section>
+
+<section id="stage">
+  <h2><span class="num">06</span>三阶段流程（与平台逻辑对齐）</h2>
+  <p class="sec-lead">顺序：<strong>Stage1 定义+规则 → Stage2 召回画像(派生) → Stage3 自检</strong>。画像依赖定义，不是相反。</p>
+  <table>
+    <tr><th>阶段</th><th>产出</th><th>温度</th><th>可信度</th></tr>
+    <tr><td>Stage1 定义+规则</td><td>semantic_definition + extraction_rules（+optimize 时 diagnosis）</td><td>0.2 收敛</td><td><span class="cred y">🟡 AI</span></td></tr>
+    <tr><td>Stage2 召回画像</td><td>recall_profile（从 Stage1 派生）+ derivation_check</td><td>0.5 发散</td><td><span class="cred y">🟡 AI</span></td></tr>
+    <tr><td>Stage3 规则自检</td><td>verification（红旗+覆盖估计）</td><td>0.0</td><td><span class="cred y">🟡 AI（第二意见）</span></td></tr>
+  </table>
+  <p>两场景共用三阶段：generate 无 badcase（Stage1 不诊断）；optimize 吃 badcase+trace（Stage1 先诊断 fix_target，Stage2 落实 recall_profile/both 的修复）。</p>
+</section>
+
+<section id="recall">
+  <h2><span class="num">07</span>召回画像生成逻辑</h2>
+  <ul>
+    <li><strong>派生约束</strong>：positive_keywords 取自定义领域词；confusion_words 来自定义"不含"侧与拦截规则；semantic_queries 是定义改写；positive_examples 从候选多样性挑选。</li>
+    <li><strong>关键词硬过滤</strong>（程序化）：丢弃含数字/金额/百分比/公司名/整句标点/超长(中文&gt;8字)的项——防过拟合。<span class="cred g">🟢 确定性</span></li>
+    <li><strong>候选去重</strong>：difflib 相似度贪心(阈值 0.8) + 打印"去掉哪些/组装多少"。<span class="cred g">🟢</span>（Phase 2 升级 embedding+MMR）</li>
+    <li><strong>数量/语言可配</strong>：keyword_count/section_count/query_count/language_hint。</li>
+  </ul>
+</section>
+
+<section id="diag">
+  <h2><span class="num">08</span>诊断与自检逻辑</h2>
+  <h3>8.1 Badcase 诊断（5 类归因）<span class="cred y">🟡</span></h3>
+  <p>依据 <strong>trace 证据</strong>归因（无 trace 只判症状、低置信）：</p>
+  <ul>
+    <li>原文窗口无目标文本 → <strong>召回问题</strong>（改画像）</li>
+    <li>窗口有但漏抽/误抽 → <strong>BOM 问题</strong>（改规则）；覆盖率缺口特判：检查"剔除规则"是否误杀期望段</li>
+    <li>reasoning 显示模型想错 → <strong>推理问题</strong>（补 few-shot）</li>
+    <li>提示词 I/O 缺陷 → <strong>Prompt 模板</strong>；多因 → <strong>混合</strong></li>
+  </ul>
+  <p>每条带 <code>fix_target</code> 路由修复落点。阈值固定 80%，靠"抽得更完整"达标。</p>
+  <h3>8.2 规则自检 Stage3 <span class="cred y">🟡</span></h3>
+  <p>审核员拿 BOM+正例+误抽反例逐条验证：正例能否抽(会不会被拦截误杀)、反例能否拦、覆盖估计、红旗（拦截误杀/写死公司名=过拟合）。是"第二意见"，Phase 2 可升级为确定性规则引擎 <span class="cred g">🟢</span>。</p>
+</section>
+
+<section id="desens">
+  <h2><span class="num">09</span>脱敏引擎</h2>
+  <ul>
+    <li><strong>定位</strong>：出网合规闸门。业务在工具内看真实数据；仅数据出网去外部 LLM 时瞬时假名化，不持久化。</li>
+    <li><strong>策略</strong>：角色化占位（【采购方】【供应商】【金额_1】【人名_1】），保句法结构；规则(手机/身份证/金额)确定性 <span class="cred g">🟢</span>，NER(公司/人名) <span class="cred y">🟡</span>。</li>
+    <li><strong>可逆映射</strong>：每次调用内存内维护，返回规则可回贴（角色化本身通用，不必反查）。</li>
+    <li><strong>规则可配</strong>：对接公司合规清单，设置页管理。</li>
+  </ul>
+</section>
+
+<section id="version">
+  <h2><span class="num">10</span>版本管理 / 收益 / 回归</h2>
+  <ul>
+    <li><strong>版本快照</strong>：每次生成/优化存 bom_version（不可变）；可回滚、可 diff。<span class="cred g">🟢</span></li>
+    <li><strong>优化收益</strong>：版本 N vs N-1 两份<strong>导入的跑批结果</strong>做 badcase 集合 diff：旧错→新对=修复；旧对→新错=回归；net=修复-回归。<span class="cred g">🟢</span></li>
+    <li><strong>回归守护</strong>：优化条款 A 后，把<strong>其它条款</strong>的跑批结果也导入对比，看准确率是否下降（灾难性遗忘）。<span class="cred g">🟢</span>（前提：其它条款结果也导入）</li>
+  </ul>
+  <div class="callout info"><div class="t">可信度说明</div><p>收益/回归是确定性计算(🟢)，但<strong>前提是导入的跑批结果准确</strong>；导入错则结论错。</p></div>
+</section>
+
+<section id="dashboard">
+  <h2><span class="num">11</span>大盘指标逻辑（哪些事实、哪些 AI）</h2>
+  <table>
+    <tr><th>指标</th><th>来源</th><th>可信度</th></tr>
+    <tr><td>整体准确率 / 趋势</td><td>导入 run_result 聚合</td><td><span class="cred g">🟢 事实</span></td></tr>
+    <tr><td>修复 / 回归 / 净收益</td><td>版本 diff 计算</td><td><span class="cred g">🟢 计算</span></td></tr>
+    <tr><td>badcase 5 类归因占比</td><td>依赖 diagnosis</td><td><span class="cred y">🟡 继承 AI 归因</span></td></tr>
+    <tr><td>重点关注(最低/下降最多)</td><td>事实排序</td><td><span class="cred g">🟢 事实排序</span></td></tr>
+    <tr><td>测试集建议</td><td>LLM 分析(仅低准触发)</td><td><span class="cred y">🟡 建议</span></td></tr>
+  </table>
+  <div class="callout warn"><div class="t">不预设评级</div><p>大盘<strong>不设"优良中差"健康度</strong>；任何分级阈值由业务领导定义后才上线。仅展示事实数据与事实排序。</p></div>
+</section>
+
+<section id="stack">
+  <h2><span class="num">12</span>技术栈选型</h2>
+  <table>
+    <tr><th>层</th><th>选型</th><th>理由</th></tr>
+    <tr><td>语言</td><td>Python 3.11+</td><td>LLM/数据生态、团队熟悉</td></tr>
+    <tr><td>前端</td><td>Streamlit</td><td>数据/看板类，Python 一体，2 人 hold 得住</td></tr>
+    <tr><td>ORM/迁移</td><td>SQLAlchemy + Alembic</td><td>schema 版本化、协作同步</td></tr>
+    <tr><td>数据库</td><td>MySQL（utf8mb4，JSON 列）</td><td>本地、生产级、嵌套用 JSON</td></tr>
+    <tr><td>契约</td><td>Pydantic v2</td><td>节点 I/O 强类型</td></tr>
+    <tr><td>脱敏</td><td>Presidio + 规则</td><td>本地 NER + 可配规则</td></tr>
+    <tr><td>LLM 客户端</td><td>OpenAI 兼容（可配 base_url）</td><td>接 Gemini/自建/代理，api_key+url 自填</td></tr>
+    <tr><td>测试</td><td>pytest</td><td>每节点独立可测</td></tr>
+    <tr><td>向量库</td><td>ChromaDB（Phase 2）</td><td>历史 few-shot + 多样性挑选</td></tr>
+  </table>
+</section>
+
+<section id="dir">
+  <h2><span class="num">13</span>目录结构</h2>
+  <div class="schema">CC-BOMGenerator/
+├─ config/llm.yaml            <span class="c"># 模型配置(密钥不入库)</span>
+├─ docs/design/               <span class="c"># 业务/技术/Agent 设计 + 原型</span>
+├─ prompts/                   <span class="c"># 提示词(XML+角色, 与代码分离)</span>
+├─ src/cc_bom_generator/
+│  ├─ contracts/              <span class="c"># 【先建】Pydantic 契约</span>
+│  ├─ nodes/                  <span class="c"># ingest/anonymize/generate/diagnose/optimize/verify/apply/evaluate</span>
+│  ├─ db/                     <span class="c"># SQLAlchemy 模型 + Alembic</span>
+│  ├─ ui/                     <span class="c"># Streamlit 工作台/大盘/设置</span>
+│  └─ llm/                    <span class="c"># OpenAI 兼容客户端 + 重试</span>
+├─ data/samples/              <span class="c"># 脱敏样例</span>
+└─ tests/                     <span class="c"># 每节点单测</span></div>
+</section>
+
+<section id="phase">
+  <h2><span class="num">14</span>分期路线</h2>
+  <table>
+    <tr><th>期</th><th>范围</th></tr>
+    <tr><td>Phase 1（PoC 已验 + 核心）</td><td>ingest/generate/optimize/verify/脱敏/版本/基础大盘；API+手动双模式；Excel 导入导出</td></tr>
+    <tr><td>Phase 2</td><td>向量库(历史 few-shot + 多样性正例 embedding)、对话 Copilot Agent、回归守护自动化、多用户</td></tr>
+    <tr><td>Phase 3</td><td>部署、与平台对接（对接点=节点边界）、权限</td></tr>
+  </table>
+</section>
+
+<section id="config">
+  <h2><span class="num">15</span>配置体系（全外置）</h2>
+  <ul>
+    <li><strong>模型</strong>：config/llm.yaml（api_key/base_url/model/分阶段温度）。</li>
+    <li><strong>提示词</strong>：prompts/*.txt（XML 结构 + 每阶段角色 + <code>{{var}}</code> 占位），改提示词不改代码。</li>
+    <li><strong>脱敏规则</strong>：设置页 + 配置文件。</li>
+    <li><strong>skill 参数</strong>：去重阈值、画像数量、trace_fields、language_hint 等 per-条款 yaml。</li>
+  </ul>
+</section>
+
+<section id="nonfunc">
+  <h2><span class="num">16</span>非功能</h2>
+  <ul>
+    <li><strong>数据隔离</strong>：各开发本地 MySQL，数据不入库；样例须脱敏。</li>
+    <li><strong>合规</strong>：出网自动脱敏；真实合同数据绝不直接发外部模型。</li>
+    <li><strong>性能</strong>：单机/少数人 PoC，SQLite 级并发足够；Phase 3 多用户再优化。</li>
+    <li><strong>可观测</strong>：每节点日志（去重明细、trace 解析、归因）；AI 产物必标可信度。</li>
+  </ul>
+</section>
+
+<footer class="foot"><span>CC-BOMGenerator · 技术设计文档</span><span>V0.1 · 2026-06-28 · 实现前评审稿</span></footer>
+</main>
+</div>
+</body>
+</html>

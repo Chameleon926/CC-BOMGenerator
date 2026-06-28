@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC-BOMGenerator · 对话 Agent 设计文档</title>
+<style>
+  :root{--primary:#4f46e5;--primary-dark:#4338ca;--primary-light:#eef2ff;--ink:#0f172a;--ink-2:#334155;--muted:#64748b;--muted-2:#94a3b8;--line:#e6e8ee;--bg:#fff;--surface:#f8fafc;--surface-2:#f1f5f9;--green:#059669;--green-bg:#ecfdf5;--red:#dc2626;--red-bg:#fef2f2;--amber:#d97706;--amber-bg:#fffbeb;--blue:#2563eb;--blue-bg:#eff6ff;--purple:#7c3aed;--purple-bg:#f5f3ff;--teal:#0d9488;--teal-bg:#f0fdfa;--shadow:0 1px 3px rgba(15,23,42,.06);--radius:14px;--radius-sm:9px}
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;font-size:15px}
+  .layout{display:flex;align-items:flex-start;justify-content:center}
+  .toc{width:250px;position:sticky;top:0;align-self:flex-start;height:100vh;overflow-y:auto;padding:36px 18px 60px 40px;border-right:1px solid var(--line);font-size:13px;flex-shrink:0}
+  .toc .brand{font-weight:700;font-size:14px;margin-bottom:4px}.toc .brand-sub{font-size:11px;color:var(--muted-2);margin-bottom:22px}
+  .toc h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2);margin:18px 0 8px;font-weight:600}
+  .toc ol{list-style:none;padding:0;margin:0}.toc ol li{margin:1px 0}.toc ol li a{color:var(--ink-2);display:block;padding:5px 10px;border-radius:7px;transition:.12s}.toc ol li a:hover{background:var(--surface);color:var(--primary)}
+  .content{flex:0 1 900px;min-width:0;padding:0 64px 140px;max-width:900px}
+  .hero{padding:60px 0 38px;border-bottom:1px solid var(--line);margin-bottom:42px}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--purple);background:var(--purple-bg);padding:6px 13px;border-radius:999px;margin-bottom:20px}
+  h1.title{font-size:36px;line-height:1.18;letter-spacing:-.025em;margin:0 0 14px;font-weight:800}
+  .subtitle{font-size:16px;color:var(--muted);max-width:640px;margin:0 0 24px}
+  .meta{display:flex;flex-wrap:wrap;gap:10px}.meta .chip{font-size:12.5px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);padding:6px 12px;border-radius:8px}.meta .chip b{color:var(--muted);font-weight:500;margin-right:6px}
+  section{margin-bottom:50px;scroll-margin-top:20px}
+  h2{font-size:23px;letter-spacing:-.02em;margin:0 0 6px;font-weight:750;display:flex;align-items:center;gap:12px}
+  h2 .num{font-size:12.5px;font-weight:700;color:#fff;background:var(--purple);width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+  .sec-lead{color:var(--muted);font-size:14.5px;margin:0 0 20px;padding-left:42px}
+  h3{font-size:17px;margin:28px 0 11px;font-weight:680} h4{font-size:14.5px;margin:18px 0 8px;font-weight:650;color:var(--ink-2)}
+  p{margin:0 0 13px} ul,ol{padding-left:22px;margin:0 0 14px} li{margin:6px 0} strong{font-weight:650}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:var(--surface-2);padding:2px 6px;border-radius:5px;color:var(--primary-dark)}
+  .callout{border-radius:var(--radius);padding:14px 17px;margin:14px 0;border:1px solid;position:relative}
+  .callout.info{background:var(--blue-bg);border-color:#dbeafe}.callout.warn{background:var(--amber-bg);border-color:#fde68a}.callout.success{background:var(--green-bg);border-color:#a7f3d0}.callout.purple{background:var(--purple-bg);border-color:#e9d5ff}
+  .callout .t{font-weight:680;margin-bottom:4px;font-size:13.5px}.callout p:last-child{margin-bottom:0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+  th,td{padding:10px 13px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top} th{background:var(--surface-2);font-weight:650;color:var(--ink-2);font-size:12px} tr:last-child td{border-bottom:0}
+  .cred{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px}
+  .cred.g{background:var(--green-bg);color:var(--green)}.cred.y{background:var(--amber-bg);color:var(--amber)}
+  .schema{background:#0f172a;color:#e2e8f0;border-radius:var(--radius-sm);padding:14px 16px;font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;margin:12px 0}
+  /* chat mock */
+  .chat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:14px 0}
+  .msg{margin-bottom:12px}.msg:last-child{margin-bottom:0}
+  .msg .who{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px}
+  .bubble{display:inline-block;max-width:88%;padding:10px 13px;border-radius:11px;font-size:13px;line-height:1.6}
+  .bubble.user{background:var(--primary);color:#fff;border-bottom-right-radius:3px}
+  .bubble.bot{background:#fff;border:1px solid var(--line);border-bottom-left-radius:3px}
+  .bubble.bot .ev{font-size:11px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)}
+  .card-in-msg{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin:7px 0;font-size:12px}
+  .act{display:inline-block;background:var(--primary-light);color:var(--primary-dark);border:1px solid #c7d2fe;font-size:11.5px;padding:3px 9px;border-radius:6px;margin:4px 4px 0 0;cursor:pointer;font-weight:500}
+  .pause{background:var(--amber-bg);border:1px dashed #fcd34d;border-radius:8px;padding:7px 11px;font-size:12px;color:#92400e;margin:7px 0;font-weight:600}
+  footer.foot{margin-top:50px;padding-top:22px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted-2);display:flex;justify-content:space-between}
+  @media(max-width:1000px){.toc{display:none}.content{padding:0 28px 100px;flex-basis:100%}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc">
+  <div class="brand">对话 Agent 设计</div><div class="brand-sub">Copilot · 侧边助手</div>
+  <h4>文档</h4>
+  <ol>
+    <li><a href="#pos">1 · 定位</a></li>
+    <li><a href="#need">2 · 需求矩阵</a></li>
+    <li><a href="#cap">3 · 能力清单</a></li>
+    <li><a href="#form">4 · 形态设计</a></li>
+    <li><a href="#arch">5 · 架构</a></li>
+    <li><a href="#tool">6 · 工具集契约</a></li>
+    <li><a href="#sample">7 · 对话样例</a></li>
+    <li><a href="#memory">8 · 记忆设计</a></li>
+    <li><a href="#rule">9 · 安全铁律</a></li>
+    <li><a href="#phase">10 · 分期</a></li>
+  </ol>
+</nav>
+<main class="content">
+<header class="hero">
+  <span class="eyebrow">对话 Agent 设计文档 · Copilot Design</span>
+  <h1 class="title">条款工作台<br>对话 Copilot 设计</h1>
+  <p class="subtitle">一个挂在条款工作台右侧的"加速器"Agent：用自然语言查 badcase/归因、解释、生成/优化规则。复用三阶段引擎，不重写；生成必经人审，回答必带证据与可信度。</p>
+  <div class="meta"><span class="chip"><b>版本</b>V0.1</span><span class="chip"><b>定位</b>加速器（非主线）</span><span class="chip"><b>架构</b>LangGraph 状态机+人审</span><span class="chip"><b>上线</b>Phase 2</span></div>
+</header>
+
+<section id="pos">
+  <h2><span class="num">01</span>定位</h2>
+  <p class="sec-lead">Copilot 是"加速器"，不是"主线"。主线是条款工作台（三阶段）+ 质量大盘。</p>
+  <ul>
+    <li><strong>不替代工作台</strong>：核心生成/优化/版本仍在工作台；Copilot 只是把高频操作"说一句话就能做"。</li>
+    <li><strong>后置上线</strong>：三阶段 + 工作台 + 大盘跑顺后才上 Copilot（它本质是这三者的"对话式外壳"）。</li>
+    <li><strong>面向三类用户</strong>：合同商务部（操作条款）、数据专家（看归因/回归）、领导（看收益/风险）。</li>
+  </ul>
+  <div class="callout purple"><div class="t">一句话</div><p>Copilot = 三阶段引擎 + 一组查询/执行工具 + 一个带人审断点的对话循环。它编排，不重写核心逻辑。</p></div>
+</section>
+
+<section id="need">
+  <h2><span class="num">02</span>需求矩阵（谁、想说什么、Agent 干啥）</h2>
+  <table>
+    <tr><th>角色</th><th>典型问法</th><th>Agent 行为</th></tr>
+    <tr><td>合同商务</td><td>"把违约金最近漏抽的 5 条列出来"</td><td>查 badcase+trace+归因 → 列卡片</td></tr>
+    <tr><td>合同商务</td><td>"帮付款支持文档生成一版新规则"</td><td>跑三阶段 → ⏸人审 → 采纳落库</td></tr>
+    <tr><td>合同商务</td><td>"这个条款为啥抽不准？"</td><td>查归因+版本diff → 解释</td></tr>
+    <tr><td>数据专家</td><td>"本月 badcase 主要归因是啥？"</td><td>聚合归因占比 → 结论+图表</td></tr>
+    <tr><td>数据专家</td><td>"哪些条款这周回归了？"</td><td>查 optimization_log → 列回归条款</td></tr>
+    <tr><td>领导</td><td>"本周优化净收益多少？"</td><td>查收益 → 一句话+数字</td></tr>
+    <tr><td>领导</td><td>"现在准确率最低的几个条款？"</td><td>事实排序 → 列表</td></tr>
+  </table>
+</section>
+
+<section id="cap">
+  <h2><span class="num">03</span>能力清单（5 类）</h2>
+  <ol>
+    <li><strong>查询</strong>：badcase / 当前 BOM / 归因 / 版本 / 大盘指标。</li>
+    <li><strong>解释</strong>：为什么准/不准（引用归因、trace、版本 diff）。</li>
+    <li><strong>生成/优化</strong>：跑三阶段（generate/optimize），产出 BOM 草稿。</li>
+    <li><strong>批量编排</strong>：对多个低准确率条款批量生成建议。</li>
+    <li><strong>新手引导</strong>："我该怎么做？" → 分步指引。</li>
+  </ol>
+</section>
+
+<section id="form">
+  <h2><span class="num">04</span>形态设计</h2>
+  <p class="sec-lead">挂在工作台右侧/悬浮窗。主区仍是工作台；Copilot 不喧宾夺主。</p>
+  <h3>4.1 消息类型（不止文字）</h3>
+  <ul>
+    <li><strong>文本</strong>：自然语言回答 + 结论。</li>
+    <li><strong>卡片</strong>：badcase 列表、规则建议、小图表（归因占比/趋势）。</li>
+    <li><strong>操作按钮</strong>：采纳 / 去优化 / 查看证据 / 跳转条款。</li>
+    <li><strong>证据 + 可信度</strong>：每条 AI 回答底部标注"依据：badcase#X / trace"与 🟡AI生成·待复核。</li>
+  </ul>
+  <h3>4.2 界面示意</h3>
+  <div class="chat">
+    <div class="msg"><div class="who">你</div><div class="bubble user">把违约金最近漏抽的5条列出来</div></div>
+    <div class="msg"><div class="who">Copilot</div><div class="bubble bot">找到违约金（销售域）近一版 v2 的 5 条漏抽，归因均为【BOM问题·规则过严】：
+      <div class="card-in-msg">样本3 · 漏抽 · 「乙方逾期交货，每日按合同总价千分之五…」<br><span style="color:var(--muted)">根因：关键词未覆盖"千分之五"表述</span></div>
+      <span class="act">▶ 去优化</span><span class="act">查看 trace</span>
+      <div class="ev">依据：badcase #3/#7/#9… · 🟡 AI 归因·待复核</div>
+    </div></div>
+  </div>
+</section>
+
+<section id="arch">
+  <h2><span class="num">05</span>架构（LangGraph 状态机 + 人审断点）</h2>
+  <div class="schema"><span style="color:#64748b"># 对话循环（每轮）</span>
+用户输入
+  │
+  ▼
+[意图识别] ── 路由 ──▶ [查询类] ──▶ 选工具(query_*) ──▶ 作答(带证据)
+                │
+                └──▶ [生成/优化类] ──▶ run_generate/optimize(复用三阶段)
+                                       │
+                              产出"建议改动(草稿)"
+                                       │
+                                <span style="color:#fbbf24">⏸ 人审断点（interrupt）</span>  <span style="color:#64748b"># 用户确认才落库</span>
+                                       │
+                              [采纳] → apply(版本化) → 作答
+                              [拒绝/调整] → 回到生成</div>
+  <ul>
+    <li><strong>状态</strong>：当前选中条款（上下文）+ 对话历史 + 短期记忆。</li>
+    <li><strong>复用引擎</strong>：generate/optimize/verify 节点直接调用，Copilot 不重写核心。</li>
+    <li><strong>人审断点</strong>：LangGraph <code>interrupt</code>，生成草稿后暂停，用户点"采纳"才 apply 落库——<strong>Agent 不擅自改规则</strong>。</li>
+    <li><strong>选型</strong>：LangGraph（状态机+人审，最贴合）；备选 Anthropic Agent SDK / Dify·Coze（低代码）。</li>
+  </ul>
+</section>
+
+<section id="tool">
+  <h2><span class="num">06</span>工具集契约（Agent 可调用的工具）</h2>
+  <table>
+    <tr><th>工具</th><th>输入</th><th>输出</th><th>可信度</th></tr>
+    <tr><td><code>query_badcases</code></td><td>block_code, type, limit</td><td>badcase 列表</td><td><span class="cred g">🟢 事实</span></td></tr>
+    <tr><td><code>query_clause_bom</code></td><td>block_code, version</td><td>BOM 快照</td><td><span class="cred g">🟢 事实</span></td></tr>
+    <tr><td><code>query_diagnosis</code></td><td>block_code, version</td><td>归因结果</td><td><span class="cred y">🟡 AI 归因</span></td></tr>
+    <tr><td><code>query_dashboard</code></td><td>指标名/范围</td><td>准确率/收益/归因占比</td><td><span class="cred g">🟢</span>/<span class="cred y">🟡</span></td></tr>
+    <tr><td><code>explain_version_diff</code></td><td>block_code, v_a, v_b</td><td>版本差异说明</td><td><span class="cred g">🟢 diff+🟡 解读</span></td></tr>
+    <tr><td><code>run_generate / run_optimize</code></td><td>block_code, 数据</td><td>BOM 草稿（待审）</td><td><span class="cred y">🟡 AI 生成</span></td></tr>
+    <tr><td><code>apply_bom</code></td><td>block_code, 草稿, 确认</td><td>新版本（落库）</td><td><span class="cred g">🟢 仅人审后</span></td></tr>
+  </table>
+  <div class="callout info"><div class="t">工具即节点</div><p>查询工具直接读库（事实🟢）；run_* 复用三阶段节点（AI🟡）；apply 仅在人审确认后执行。Agent 本身不持有业务逻辑。</p></div>
+</section>
+
+<section id="sample">
+  <h2><span class="num">07</span>对话样例（含人审断点）</h2>
+  <h3>样例 A：生成新规则（完整人审流）</h3>
+  <div class="chat">
+    <div class="msg"><div class="who">你</div><div class="bubble user">帮"保密条款"生成一版新规则</div></div>
+    <div class="msg"><div class="who">Copilot</div><div class="bubble bot">已识别为<strong>生成场景</strong>（无旧 BOM）。跑三阶段… 完成，草稿如下：
+      <div class="card-in-msg">Stage1 定义：保密信息定义/义务/期限…<br>Stage2 画像：关键词 保密信息·保密义务…<br>Stage3 自检：正例 4/4，🚩1红旗(范围过宽)</div>
+      <div class="pause">⏸ 人审：这是 AI 草稿(🟡待复核)。采纳才落库为 v1。</div>
+      <span class="act">✓ 采纳为 v1</span><span class="act">✗ 重新生成</span><span class="act">手动调整</span>
+      <div class="ev">依据：初始测试集 720 条 · 🟡 AI 生成·待复核</div></div></div>
+  </div>
+  <h3>样例 B：解释答疑</h3>
+  <div class="chat">
+    <div class="msg"><div class="who">你</div><div class="bubble user">为什么争议解决准确率掉了？</div></div>
+    <div class="msg"><div class="who">Copilot</div><div class="bubble bot">v1→v2 期间准确率 83%→79%（↓4%）。主因：<strong>3 条新误抽</strong>，归因【BOM问题·规则过松】——核心匹配规则把"协商解决"也纳入了（属争议前置，非争议解决条款）。
+      <div class="ev">依据：optimization_log + diagnosis#12-14 · 🟡 AI 归因·待复核</div>
+      <span class="act">▶ 去优化（收紧匹配规则）</span></div></div>
+  </div>
+</section>
+
+<section id="memory">
+  <h2><span class="num">08</span>记忆设计</h2>
+  <ul>
+    <li><strong>短期记忆</strong>：当前选中条款（上下文）+ 本会话对话历史。会话结束即清。</li>
+    <li><strong>长期记忆（Phase 2）</strong>：把"trace→成功修法"对子向量化入库；Agent 遇相似 badcase 时检索借鉴（few-shot）。这是向量库的正当用途之一。</li>
+    <li><strong>不跨用户</strong>：记忆按用户/项目隔离，不泄露他人数据。</li>
+  </ul>
+</section>
+
+<section id="rule">
+  <h2><span class="num">09</span>安全与铁律</h2>
+  <table>
+    <tr><th>铁律</th><th>落地</th></tr>
+    <tr><td>不擅自改规则</td><td>生成后停在<strong>人审断点</strong>，用户确认才 apply</td></tr>
+    <tr><td>回答带证据+可信度</td><td>每条 AI 回答标注依据(引用 badcase/trace/版本) + 🟡待复核</td></tr>
+    <tr><td>复用三阶段引擎</td><td>Copilot 只编排+对话，核心逻辑调用现有节点，不重写</td></tr>
+    <tr><td>出网脱敏</td><td>调外部 LLM 前自动脱敏（同主流程）</td></tr>
+    <tr><td>不预设评级</td><td>被问"健康度/优良中差"时，回答"阈值待业务定义"，不编标准</td></tr>
+  </table>
+</section>
+
+<section id="phase">
+  <h2><span class="num">10</span>分期</h2>
+  <table>
+    <tr><th>期</th><th>Copilot 范围</th></tr>
+    <tr><td>Phase 1</td><td>不做（先把工作台+三阶段+大盘跑顺）</td></tr>
+    <tr><td>Phase 2</td><td>查询类 + 解释类 + 生成/优化(带人审)；短期记忆；侧边窗形态</td></tr>
+    <tr><td>Phase 3</td><td>长期记忆(向量库 few-shot)、批量编排、多用户、与平台对接</td></tr>
+  </table>
+  <div class="callout warn"><div class="t">前提</div><p>Copilot 的所有能力都依赖底层节点 + 数据（导入的跑批结果/诊断/版本）。底层没数据/没跑顺，Copilot 就是无源之水。所以<strong>必须先 Phase 1</strong>。</p></div>
+</section>
+
+<footer class="foot"><span>CC-BOMGenerator · 对话 Agent 设计文档</span><span>V0.1 · 2026-06-28 · Phase 2 评审稿</span></footer>
+</main>
+</div>
+</body>
+</html>
