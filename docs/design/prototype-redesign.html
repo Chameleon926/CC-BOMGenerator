@@ -3,27 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>合同规则编排工作台 — 重构原型 v2</title>
+<title>合同规则编排工作台 — 重构原型 v3</title>
 <style>
   :root{
-    --bg:#f5f7fb; --surface:#fff; --sidebar:#0f1b3d; --sidebar-2:#16224a; --sidebar-hover:#1d2c58;
+    --bg:#f5f7fb; --surface:#fff; --sidebar:#0f1b3d; --sidebar-hover:#1d2c58;
     --text:#1e293b; --muted:#64748b; --faint:#94a3b8; --border:#e6eaf2; --surface-2:#f1f5f9;
     --primary:#4f46e5; --primary-2:#6366f1; --primary-soft:#eef0fc;
     --success:#16a34a; --success-soft:#dcfce7; --warn:#d97706; --warn-soft:#fef3c7;
-    --danger:#dc2626; --danger-soft:#fee2e2; --teal:#0d9488; --teal-soft:#ccfbge;
+    --danger:#dc2626; --danger-soft:#fee2e2; --teal:#0d9488;
     --shadow:0 1px 3px rgba(15,27,61,.06),0 1px 2px rgba(15,27,61,.05);
     --shadow-lg:0 12px 30px -14px rgba(15,27,61,.22); --radius:13px;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
+  *{box-sizing:border-box;margin:0;padding:0} html,body{height:100%}
   body{font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
   .app{display:flex;height:100vh;overflow:hidden}
-  /* sidebar */
   .sidebar{width:236px;background:var(--sidebar);color:#c7d0e3;display:flex;flex-direction:column;flex-shrink:0}
   .brand{padding:20px 18px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,.07)}
   .brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--primary-2),#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff}
-  .brand .name{font-size:14.5px;font-weight:600;color:#fff;line-height:1.25}
-  .brand .sub{font-size:11px;color:#7e8aa8}
+  .brand .name{font-size:14.5px;font-weight:600;color:#fff;line-height:1.25} .brand .sub{font-size:11px;color:#7e8aa8}
   .nav{padding:14px 10px;flex:1;overflow-y:auto}
   .nav-group{font-size:10.5px;color:#5e6b8a;text-transform:uppercase;letter-spacing:.08em;padding:12px 10px 6px;font-weight:600}
   .nav-item{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:9px;cursor:pointer;font-size:13.5px;color:#b8c2d8;transition:.15s;margin-bottom:2px}
@@ -34,344 +31,311 @@
   .sidebar-foot{padding:13px 16px;border-top:1px solid rgba(255,255,255,.07);font-size:11.5px;color:#7e8aa8}
   .sidebar-foot .me{display:flex;align-items:center;gap:9px}
   .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600}
-  /* main */
   .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
   .topbar{height:60px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 26px;gap:14px;flex-shrink:0}
-  .topbar h1{font-size:16px;font-weight:600}
-  .topbar .crumb{color:var(--faint);font-size:13px}
-  .topbar .spacer{flex:1}
+  .topbar h1{font-size:16px;font-weight:600} .topbar .crumb{color:var(--faint);font-size:13px} .topbar .spacer{flex:1}
   .pill{display:inline-flex;align-items:center;gap:6px;background:var(--success-soft);color:var(--success);font-size:12px;font-weight:600;padding:5px 11px;border-radius:20px}
   .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
   .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface);font-size:13px;font-weight:500;cursor:pointer;color:var(--text);transition:.15s;font-family:inherit}
-  .btn:hover{background:var(--surface-2);border-color:#cbd5e1}
-  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
-  .btn.primary:hover{background:#4338ca}
-  .btn.sm{padding:5px 10px;font-size:12px}
+  .btn:hover{background:var(--surface-2);border-color:#cbd5e1} .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff} .btn.primary:hover{background:#4338ca} .btn.sm{padding:5px 10px;font-size:12px}
   .content{flex:1;overflow-y:auto;padding:22px 26px}
-  .view{display:none;max-width:1200px;margin:0 auto;animation:fade .22s ease}
-  .view.active{display:block}
+  .view{display:none;max-width:1200px;margin:0 auto;animation:fade .22s ease} .view.active{display:block}
   @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
-  /* generic */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
   .card-pad{padding:18px 20px}
-  .card h3{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-  .card h3 .hint{font-size:12px;color:var(--faint);font-weight:400}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px} .card h3 .hint{font-size:12px;color:var(--faint);font-weight:400}
   .muted{color:var(--muted)} .faint{color:var(--faint)}
   .tag{display:inline-flex;align-items:center;font-size:11.5px;padding:2px 8px;border-radius:6px;font-weight:500}
-  .tag.indigo{background:var(--primary-soft);color:var(--primary)}
-  .tag.teal{background:#ccfbf1;color:var(--teal)}
-  .tag.green{background:var(--success-soft);color:var(--success)}
-  .tag.amber{background:var(--warn-soft);color:var(--warn)}
-  .tag.red{background:var(--danger-soft);color:var(--danger)}
-  .tag.gray{background:#f1f5f9;color:#475569}
-  .section-title{font-size:18px;font-weight:700;margin-bottom:3px}
-  .section-desc{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .tag.indigo{background:var(--primary-soft);color:var(--primary)} .tag.teal{background:#ccfbf1;color:var(--teal)}
+  .tag.green{background:var(--success-soft);color:var(--success)} .tag.amber{background:var(--warn-soft);color:var(--warn)}
+  .tag.red{background:var(--danger-soft);color:var(--danger)} .tag.gray{background:#f1f5f9;color:#475569}
+  .tag.purple{background:#f3e8ff;color:#7c3aed}
+  .section-title{font-size:18px;font-weight:700;margin-bottom:3px} .section-desc{color:var(--muted);font-size:13px;margin-bottom:16px}
   .grid{display:grid;gap:14px}
+  .back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--muted);cursor:pointer;font-size:13px;margin-bottom:14px;font-weight:500} .back-btn:hover{color:var(--primary)}
 
-  /* workbench layout */
-  .wb{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
-  .clause-list{display:flex;flex-direction:column;gap:9px;max-height:calc(100vh - 150px);overflow-y:auto;padding-right:4px}
-  .clause-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px 14px;cursor:pointer;transition:.15s;box-shadow:var(--shadow)}
-  .clause-card:hover{border-color:#c7d2fe;transform:translateY(-1px)}
-  .clause-card.active{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
-  .clause-card .cn{font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px}
-  .clause-card .cm{font-size:11.5px;color:var(--muted);margin:3px 0 9px}
-  .acc-mini{display:flex;justify-content:space-between;align-items:center;font-size:12px}
-  .acc-mini b{font-size:16px;font-weight:700}
-  .acc-mini.ok b{color:var(--success)} .acc-mini.mid b{color:var(--warn)} .acc-mini.low b{color:var(--danger)}
+  /* browser */
+  .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+  .search{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 13px;box-shadow:var(--shadow)}
+  .search input{border:none;outline:none;flex:1;font-size:13px;font-family:inherit;background:transparent}
+  .domain-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}
+  .chip{padding:6px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:12.5px;cursor:pointer;color:var(--muted)}
+  .chip.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:500}
+  .clause-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .cc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px;cursor:pointer;transition:.16s;box-shadow:var(--shadow)}
+  .cc:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:#c7d2fe}
+  .cc .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px;gap:8px}
+  .cc .cn{font-size:14.5px;font-weight:600} .cc .cm{font-size:11.5px;color:var(--muted);margin:2px 0 11px}
+  .cc .stat{display:flex;justify-content:space-between;align-items:center;padding-top:11px;border-top:1px dashed var(--border)}
+  .acc b{font-size:17px;font-weight:700} .acc.ok b{color:var(--success)} .acc.mid b{color:var(--warn)} .acc.low b{color:var(--danger)}
 
-  /* upload bound to clause */
-  .upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:14px}
+  /* detail */
+  .dhead{display:flex;align-items:center;gap:13px;margin-bottom:16px;flex-wrap:wrap}
+  .dhead .big{font-size:22px;font-weight:700}
+  .upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:13px}
   .up-slot{border:1.5px dashed #cbd5e1;border-radius:10px;padding:14px 12px;text-align:center;cursor:pointer;transition:.15s;background:var(--surface)}
   .up-slot:hover{border-color:var(--primary);background:var(--primary-soft)}
-  .up-slot .ut{font-size:12px;font-weight:600;margin-bottom:3px}
-  .up-slot .ud{font-size:11px;color:var(--faint)}
-  .up-slot.has{border-style:solid;border-color:var(--success);background:var(--success-soft)}
-  .up-slot.has .ud{color:var(--success);font-weight:600}
+  .up-slot .ut{font-size:12px;font-weight:600;margin-bottom:3px} .up-slot .ud{font-size:11px;color:var(--faint)}
+  .up-slot.has{border-style:solid;border-color:var(--success);background:var(--success-soft)} .up-slot.has .ud{color:var(--success);font-weight:600}
   .up-slot .sc{font-size:10px;color:var(--primary);font-weight:600;margin-top:3px}
-
-  .scenario-bar{display:flex;align-items:center;gap:10px;background:var(--primary-soft);border:1px dashed #c7d2fe;border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:12.5px}
-  .scenario-bar b{color:var(--primary)}
-
-  .stage-flow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .desens-note{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--teal);background:#ccfbf1;border-radius:8px;padding:7px 11px;margin-bottom:13px}
+  .scenario-bar{display:flex;align-items:center;gap:10px;background:var(--primary-soft);border:1px dashed #c7d2fe;border-radius:10px;padding:11px 14px;margin-bottom:13px;font-size:12.5px} .scenario-bar b{color:var(--primary)}
+  .stage-flow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:13px}
   .stage{border:1px solid var(--border);border-radius:10px;padding:12px 13px;background:#fafbfd}
   .stage .st{font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
-  .stage .sb{font-size:12.5px;color:#475569;line-height:1.6}
-  .stage .flag{font-size:11px;color:var(--danger);margin-top:6px;font-weight:600}
-
-  .vlist{position:relative;padding-left:22px}
-  .vlist::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--border)}
-  .vitem{position:relative;margin-bottom:14px}
-  .vitem::before{content:"";position:absolute;left:-22px;top:2px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--border)}
+  .stage .sb{font-size:12.5px;color:#475569;line-height:1.6} .stage .flag{font-size:11px;color:var(--danger);margin-top:6px;font-weight:600}
+  .detail-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .vlist{position:relative;padding-left:22px} .vlist::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--border)}
+  .vitem{position:relative;margin-bottom:13px} .vitem::before{content:"";position:absolute;left:-22px;top:2px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--border)}
   .vitem.current::before{background:var(--primary);border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-soft)}
-  .vitem .vhead{display:flex;gap:8px;align-items:center;font-size:12.5px;margin-bottom:2px}
-  .vitem .vnum{font-weight:700}
-  .vitem .vnote{font-size:12px;color:var(--text)}
+  .vitem .vhead{display:flex;gap:8px;align-items:center;font-size:12.5px;margin-bottom:2px} .vitem .vnum{font-weight:700} .vitem .vnote{font-size:12px;color:var(--text)}
 
   /* dashboard */
-  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:16px}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:14px}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px;box-shadow:var(--shadow)}
-  .kpi .k{font-size:12px;color:var(--muted);margin-bottom:6px}
-  .kpi .v{font-size:24px;font-weight:700}
-  .kpi .v small{font-size:12px;color:var(--faint);font-weight:500}
-  .kpi.accent{background:linear-gradient(135deg,var(--primary),#7c3aed);border:none;color:#fff}
-  .kpi.accent .k{color:rgba(255,255,255,.82)} .kpi.accent .v small{color:rgba(255,255,255,.78)}
-  .rg{display:inline-flex;gap:5px;align-items:center;font-size:13px;margin-top:4px}
-  .rg .d{width:11px;height:11px;border-radius:3px}
+  .kpi .k{font-size:12px;color:var(--muted);margin-bottom:6px} .kpi .v{font-size:23px;font-weight:700} .kpi .v small{font-size:12px;color:var(--faint);font-weight:500}
+  .kpi.accent{background:linear-gradient(135deg,var(--primary),#7c3aed);border:none;color:#fff} .kpi.accent .k{color:rgba(255,255,255,.82)} .kpi.accent .v small{color:rgba(255,255,255,.78)}
+  .rg{display:inline-flex;gap:5px;align-items:center;font-size:13px;margin-top:4px} .rg .d{width:11px;height:11px;border-radius:3px}
   .two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:14px}
   .risk-row{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:9px;background:var(--surface)}
-  .risk-row .rn{flex:1;font-size:13px;font-weight:600}
-  .risk-row .rv{font-size:15px;font-weight:700;width:64px}
+  .risk-row .rn{flex:1;font-size:13px;font-weight:600} .risk-row .rv{font-size:15px;font-weight:700;width:60px}
   .risk-row.low .rv{color:var(--danger)} .risk-row.mid .rv{color:var(--warn)}
-  .bar-h{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px}
-  .bar-h .lbl{width:96px;color:#475569}
+  .bar-h{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px} .bar-h .lbl{width:96px;color:#475569}
   .bar-track{flex:1;height:22px;background:var(--surface-2);border-radius:6px;overflow:hidden}
   .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:8px;color:#fff;font-size:11px;font-weight:600}
-  .callout{padding:13px 15px;background:var(--warn-soft);border:1px dashed #fcd34d;border-radius:10px;font-size:12.5px;color:#92400e;margin-top:12px}
-  .callout b{color:#78350f}
-
-  /* settings */
+  .callout{padding:13px 15px;border-radius:10px;font-size:12.5px;margin-top:12px;border:1px dashed}
+  .callout.amber{background:var(--warn-soft);border-color:#fcd34d;color:#92400e} .callout.teal{background:#ccfbf1;border-color:#5eead4;color:#115e59}
+  .callout b{font-weight:700}
+  .source-note{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--teal);background:#ccfbf1;border:1px dashed #5eead4;border-radius:10px;padding:10px 14px;margin-bottom:16px}
   .set-table{width:100%;border-collapse:collapse;font-size:13px}
   .set-table th{text-align:left;background:var(--surface-2);color:var(--muted);font-weight:600;padding:11px 13px;border-bottom:1px solid var(--border);font-size:12px}
   .set-table td{padding:11px 13px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
-  .switch{position:relative;width:38px;height:21px;background:#cbd5e1;border-radius:20px;cursor:pointer;transition:.2s;flex-shrink:0}
-  .switch.on{background:var(--success)}
-  .switch::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;background:#fff;border-radius:50%;transition:.2s}
-  .switch.on::after{left:19px}
-  .inp{width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;background:#fff}
-  .inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
-  .field{margin-bottom:14px}
-  .field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px;color:#334155}
-  .mono{font-family:ui-monospace,monospace;font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:5px;color:#334155}
-
-  /* desens inline indicator */
-  .desens-note{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--teal);background:#ccfbf1;border-radius:8px;padding:7px 11px;margin-bottom:14px}
-
+  .switch{position:relative;width:38px;height:21px;background:#cbd5e1;border-radius:20px;cursor:pointer;transition:.2s;flex-shrink:0} .switch.on{background:var(--success)}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;background:#fff;border-radius:50%;transition:.2s} .switch.on::after{left:19px}
+  .inp{width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;background:#fff} .inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+  .field{margin-bottom:14px} .field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px;color:#334155}
   .footer-note{margin-top:18px;padding:13px 16px;background:var(--primary-soft);border-radius:10px;font-size:12.5px;color:#4338ca;border:1px dashed #c7d2fe}
   ::-webkit-scrollbar{width:9px;height:9px} ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:5px} ::-webkit-scrollbar-track{background:transparent}
-  @media(max-width:980px){.wb,.two-col{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}.upload-grid,.stage-flow{grid-template-columns:1fr}}
+  @media(max-width:980px){.clause-grid{grid-template-columns:repeat(2,1fr)}.kpi-row{grid-template-columns:repeat(2,1fr)}.two-col,.detail-cols,.stage-flow,.upload-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- SIDEBAR (3 入口) -->
   <aside class="sidebar">
-    <div class="brand">
-      <div class="logo">⚖</div>
-      <div><div class="name">规则编排工作台</div><div class="sub">Clause Rule Studio</div></div>
-    </div>
+    <div class="brand"><div class="logo">⚖</div><div><div class="name">规则编排工作台</div><div class="sub">Clause Rule Studio</div></div></div>
     <nav class="nav" id="nav">
       <div class="nav-group">核心</div>
-      <div class="nav-item active" data-view="workbench">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>条款工作台
-      </div>
-      <div class="nav-item" data-view="dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>质量大盘 <span class="badge">2</span>
-      </div>
+      <div class="nav-item active" data-view="workbench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>条款工作台</div>
+      <div class="nav-item" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>质量大盘 <span class="badge">2</span></div>
       <div class="nav-group">系统</div>
-      <div class="nav-item" data-view="settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 00-1.7-1L14.5 2h-5l-.3 2.5a7 7 0 00-1.7 1l-2.4-1-2 3.5 2 1.5a7 7 0 000 2l-2 1.5 2 3.5 2.4-1a7 7 0 001.7 1l.3 2.5h5l.3-2.5a7 7 0 001.7-1l2.4 1 2-3.5-2-1.5a7 7 0 00.1-1z"/></svg>设置
-      </div>
+      <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9 2 2 0 11-2.8 2.8 1.7 1.7 0 00-2.9 1.2V21a2 2 0 11-4 0 1.7 1.7 0 00-2.9-1.2 2 2 0 11-2.8-2.8 1.7 1.7 0 00-.3-2.9H3a2 2 0 110-4 1.7 1.7 0 001.5-2.9 2 2 0 112.8-2.8 1.7 1.7 0 002.9-.3V3a2 2 0 114 0 1.7 1.7 0 002.9.3 2 2 0 112.8 2.8 1.7 1.7 0 00.3 2.9H21a2 2 0 110 4z"/></svg>设置</div>
     </nav>
     <div class="sidebar-foot"><div class="me"><div class="avatar">林</div><div>合同商务部<br><span style="color:#5e6b8a">业务运营</span></div></div></div>
   </aside>
 
-  <!-- MAIN -->
   <main class="main">
     <header class="topbar">
-      <h1 id="title">条款工作台</h1>
-      <span class="crumb" id="crumb">/ 一个条款从生成到优化的全流程</span>
-      <div class="spacer"></div>
-      <span class="pill"><span class="dot"></span> 模型已连接</span>
-      <button class="btn primary">+ 新条款</button>
+      <h1 id="title">条款工作台</h1><span class="crumb" id="crumb">/ 浏览 · 搜索 · 按业务域分组</span>
+      <div class="spacer"></div><span class="pill"><span class="dot"></span> 模型已连接</span>
+      <button class="btn primary" onclick="openDetail('新条款')">+ 新条款</button>
     </header>
-
     <div class="content">
 
-      <!-- ===== WORKBENCH ===== -->
+      <!-- WORKBENCH (browser) -->
       <section class="view active" id="view-workbench">
         <div class="section-title">条款工作台</div>
-        <div class="section-desc">选一个条款 → 上传它的数据（一个入口绑三类）→ 系统自动判断场景 → 一键生成/优化。不再在多个工具间来回跳。</div>
-        <div class="wb">
-          <!-- clause list -->
-          <div class="clause-list" id="clauseList">
-            <div class="clause-card active" data-c="付款支持文档">
-              <div class="cn">付款支持文档 <span class="tag teal">条款</span></div>
-              <div class="cm">FSB0000004 · 1,240 标注 · v3</div>
-              <div class="acc-mini mid"><b>73%</b><span class="tag amber">待优化</span></div>
-            </div>
-            <div class="clause-card" data-c="违约金">
-              <div class="cn">违约金 <span class="tag teal">条款</span></div>
-              <div class="cm">FSB0000019 · 980 标注 · v2</div>
-              <div class="acc-mini low"><b>68%</b><span class="tag red">风险</span></div>
-            </div>
-            <div class="clause-card" data-c="合同金额">
-              <div class="cn">合同金额 <span class="tag indigo">要素</span></div>
-              <div class="cm">FSI0000003 · 5,230 标注 · v4</div>
-              <div class="acc-mini ok"><b>94%</b><span class="tag green">已优化</span></div>
-            </div>
-            <div class="clause-card" data-c="保密条款">
-              <div class="cn">保密条款 <span class="tag teal">条款</span></div>
-              <div class="cm">FSB0000021 · 720 标注 · v1</div>
-              <div class="acc-mini mid"><b>81%</b><span class="tag amber">待优化</span></div>
-            </div>
-            <div class="clause-card" data-c="签订日期">
-              <div class="cn">签订日期 <span class="tag indigo">要素</span></div>
-              <div class="cm">FSI0000011 · 5,001 标注 · v1</div>
-              <div class="acc-mini mid"><b>86%</b><span class="tag gray">初版</span></div>
-            </div>
-          </div>
+        <div class="section-desc">搜索/按业务域筛选条款 → 点开进入该条款的工作页（上传→自动判场景→一键生成/优化）。</div>
+        <div class="toolbar">
+          <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="q" placeholder="搜索条款/要素名称、编码、关键词…" oninput="filterList()"></div>
+          <button class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M10 18h4"/></svg>排序：准确率</button>
+        </div>
+        <div class="domain-chips" id="domainChips">
+          <span class="chip on" data-d="all">全部 9</span>
+          <span class="chip" data-d="采购">采购合同 3</span>
+          <span class="chip" data-d="销售">销售合同 2</span>
+          <span class="chip" data-d="服务">服务合同 2</span>
+          <span class="chip" data-d="工程">工程合同 1</span>
+          <span class="chip" data-d="框架">框架协议 1</span>
+        </div>
+        <div class="clause-grid" id="clauseGrid">
+          <!-- 采购 -->
+          <div class="cc" data-d="采购" data-k="付款支持文档 FSB0000004 付款"><div class="top"><div class="cn">付款支持文档</div><span class="tag indigo">采购</span></div><div class="cm">FSB0000004 · 1,240 标注 · v3</div><div class="stat"><span class="acc mid"><b>73%</b></span><span class="tag amber">待优化</span></div></div>
+          <div class="cc" data-d="采购" data-k="标的物 FSI0000007"><div class="top"><div class="cn">标的物</div><span class="tag indigo">采购</span></div><div class="cm">FSI0000007 · 4,712 标注 · v1</div><div class="stat"><span class="acc ok"><b>90%</b></span><span class="tag gray">初版</span></div></div>
+          <div class="cc" data-d="采购" data-k="合同金额 FSI0000003 金额"><div class="top"><div class="cn">合同金额</div><span class="tag indigo">采购</span></div><div class="cm">FSI0000003 · 5,230 标注 · v4</div><div class="stat"><span class="acc ok"><b>94%</b></span><span class="tag green">已优化</span></div></div>
+          <!-- 销售 -->
+          <div class="cc" data-d="销售" data-k="违约金 FSB0000019 违约"><div class="top"><div class="cn">违约金</div><span class="tag purple">销售</span></div><div class="cm">FSB0000019 · 980 标注 · v2</div><div class="stat"><span class="acc low"><b>68%</b></span><span class="tag red">风险</span></div></div>
+          <div class="cc" data-d="销售" data-k="争议解决 FSB0000023"><div class="top"><div class="cn">争议解决</div><span class="tag purple">销售</span></div><div class="cm">FSB0000023 · 1,950 标注 · v1</div><div class="stat"><span class="acc mid"><b>79%</b></span><span class="tag amber">待优化</span></div></div>
+          <!-- 服务 -->
+          <div class="cc" data-d="服务" data-k="保密条款 FSB0000021"><div class="top"><div class="cn">保密条款</div><span class="tag teal">服务</span></div><div class="cm">FSB0000021 · 720 标注 · v1</div><div class="stat"><span class="acc mid"><b>81%</b></span><span class="tag amber">待优化</span></div></div>
+          <div class="cc" data-d="服务" data-k="服务期限 FSI0000015"><div class="top"><div class="cn">服务期限</div><span class="tag teal">服务</span></div><div class="cm">FSI0000015 · 3,210 标注 · v2</div><div class="stat"><span class="acc ok"><b>89%</b></span><span class="tag green">已优化</span></div></div>
+          <!-- 工程 -->
+          <div class="cc" data-d="工程" data-k="里程碑 FSB0000030 付款"><div class="top"><div class="cn">付款里程碑</div><span class="tag amber">工程</span></div><div class="cm">FSB0000030 · 1,560 标注 · v1</div><div class="stat"><span class="acc low"><b>71%</b></span><span class="tag red">风险</span></div></div>
+          <!-- 框架 -->
+          <div class="cc" data-d="框架" data-k="签订日期 FSI0000011"><div class="top"><div class="cn">签订日期</div><span class="tag gray">框架</span></div><div class="cm">FSI0000011 · 5,001 标注 · v1</div><div class="stat"><span class="acc mid"><b>86%</b></span><span class="tag gray">初版</span></div></div>
+        </div>
+      </section>
 
-          <!-- workbench panel -->
+      <!-- CLAUSE DETAIL (工作页) -->
+      <section class="view" id="view-detail">
+        <div class="back-btn" onclick="go('workbench')">‹ 返回条款工作台</div>
+        <div class="dhead">
+          <div><div class="big" id="d-name">付款支持文档</div><div class="muted" style="margin-top:3px" id="d-meta">FSB0000004 · <span class="tag indigo">采购合同</span> · 当前 v3 · 回测 73%</div></div>
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn">查看业务可读 BOM</button><button class="btn primary">导出新版 BOM</button>
+        </div>
+
+        <div class="card card-pad" style="margin-bottom:14px">
+          <h3>① 数据（绑定本条款）<span class="hint">· 一个入口，三类数据对应两种场景</span></h3>
+          <div class="upload-grid">
+            <div class="up-slot has"><div class="ut">初始测试集</div><div class="ud">✓ 付款支持_初始.xlsx · 1,240 条</div><div class="sc">场景：生成</div></div>
+            <div class="up-slot has"><div class="ut">优化测试集（跑批结果）</div><div class="ud">✓ 付款支持_跑批.xlsx · 312 错例</div><div class="sc">场景：优化</div></div>
+            <div class="up-slot"><div class="ut">Trace（可选）</div><div class="ud">+ 粘贴/上传 trace</div><div class="sc">用于 5 类归因</div></div>
+          </div>
+          <div class="desens-note">🛡️ 出网给外部模型前自动脱敏（公司名/金额/人名/联系方式），无需手动操作 · <a href="#" onclick="go('settings');return false" style="color:var(--teal)">规则在设置</a></div>
+          <div class="scenario-bar">🤖 识别为<b>优化场景</b>（有跑批结果 + 已有 v3 旧 BOM）→ 基于旧 BOM 做归因优化，而非从头生成。</div>
+          <button class="btn primary" style="width:100%;justify-content:center" onclick="runFlow(event)">⚡ 一键生成 / 优化（三阶段自动跑）</button>
+        </div>
+
+        <div class="detail-cols">
           <div>
             <div class="card card-pad" style="margin-bottom:14px">
-              <h3>① 数据（绑定条款「<span id="curClause">付款支持文档</span>」）<span class="hint">· 一个入口，三类数据对应两种场景</span></h3>
-              <div class="upload-grid">
-                <div class="up-slot has"><div class="ut">初始测试集</div><div class="ud">✓ 付款支持_初始.xlsx · 1,240 条</div><div class="sc">场景：生成</div></div>
-                <div class="up-slot has"><div class="ut">优化测试集（跑后）</div><div class="ud">✓ 付款支持_跑批结果.xlsx · 312 条错例</div><div class="sc">场景：优化</div></div>
-                <div class="up-slot"><div class="ut">Trace（可选）</div><div class="ud">+ 粘贴或上传 trace</div><div class="sc">用于 5 类归因</div></div>
-              </div>
-              <div class="desens-note">🛡️ 出网给外部模型前自动脱敏（公司名/金额/人名/联系方式），此处无需手动操作 · <a href="#" style="color:var(--teal)">规则在设置</a></div>
-              <div class="scenario-bar">🤖 <span>系统识别：<b>优化场景</b>（检测到跑批结果 + 已有 v3 旧 BOM）→ 将基于旧 BOM 做归因优化，而非从头生成。</span></div>
-              <button class="btn primary" style="width:100%;justify-content:center" onclick="runFlow()">⚡ 一键生成 / 优化（三阶段自动跑）</button>
-            </div>
-
-            <div class="card card-pad" style="margin-bottom:14px">
-              <h3>② 生成结果 <span class="hint">· 三阶段：定义+规则 → 召回画像 → 自检</span></h3>
+              <h3>② 生成结果 <span class="hint">· 定义+规则 → 召回画像 → 自检</span></h3>
               <div class="stage-flow">
                 <div class="stage"><div class="st">Stage 1 · 定义+规则</div><div class="sb">付款支持文档：供应商提交的全套付款证明依据（发票/PO/验收/里程碑）。拦截：仅动作无具体文档。匹配：给出≥1种文档类型。</div></div>
                 <div class="stage"><div class="st">Stage 2 · 召回画像（派生）</div><div class="sb">关键词：付款支持文档·增值税发票·PO·验收证明·付款里程碑；章节：付款条款·支付与结算；语义查询×3。</div></div>
-                <div class="stage"><div class="st">Stage 3 · 规则自检</div><div class="sb">正例 5/5 可抽，反例 2/2 可拦。</div><div class="flag">🚩 1 红旗：旧规则"剔除付款日"会误杀含付款排程的正例 → 建议放宽</div></div>
-              </div>
-              <div class="row" style="display:flex;gap:10px;justify-content:flex-end">
-                <button class="btn sm">查看业务可读 BOM</button>
-                <button class="btn sm primary">采纳并保存 v4</button>
+                <div class="stage"><div class="st">Stage 3 · 规则自检</div><div class="sb">正例 5/5 可抽，反例 2/2 可拦。</div><div class="flag">🚩 旧规则"剔除付款日"会误杀含付款排程的正例 → 建议放宽</div></div>
               </div>
             </div>
-
+          </div>
+          <div>
             <div class="card card-pad">
               <h3>③ 版本历史 <span class="hint">· 准确率演进，可回滚</span></h3>
               <div class="vlist">
-                <div class="vitem current"><div class="vhead"><span class="vnum">v4（建议）</span><span class="tag green">预生成</span><span class="faint">预期 89%</span></div><div class="vnote">放宽剔除付款日规则；新增里程碑+排程覆盖。</div></div>
-                <div class="vitem"><div class="vhead"><span class="vnum">v3</span><span class="faint">06-26 · 回测 73%</span></div><div class="vnote">首次接入语义去重标注。</div></div>
-                <div class="vitem"><div class="vhead"><span class="vnum">v2</span><span class="faint">06-18 · 回测 69%</span></div><div class="vnote">补充关键词「验收证明」。</div></div>
-                <div class="vitem"><div class="vhead"><span class="vnum">v1</span><span class="tag gray">初版</span><span class="faint">06-05 · 回测 61%</span></div><div class="vnote">基于初始测试集自动生成。</div></div>
+                <div class="vitem current"><div class="vhead"><span class="vnum">v4（建议）</span><span class="tag green">预生成</span><span class="faint">预期 89%</span></div><div class="vnote">放宽剔除付款日；新增里程碑+排程覆盖。</div></div>
+                <div class="vitem"><div class="vhead"><span class="vnum">v3</span><span class="faint">06-26 · 73%</span></div><div class="vnote">首次接入语义去重标注。</div></div>
+                <div class="vitem"><div class="vhead"><span class="vnum">v2</span><span class="faint">06-18 · 69%</span></div><div class="vnote">补充关键词「验收证明」。</div></div>
+                <div class="vitem"><div class="vhead"><span class="vnum">v1</span><span class="tag gray">初版</span><span class="faint">06-05 · 61%</span></div><div class="vnote">基于初始测试集自动生成。</div></div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ===== DASHBOARD ===== -->
+      <!-- DASHBOARD -->
       <section class="view" id="view-dashboard">
         <div class="section-title">质量与风险大盘</div>
-        <div class="section-desc">给业务负责人 / 数据专家看：抽取健不健康、风险在哪、优化值不值、瓶颈在哪层。每一块都指向"发现问题 → 行动"。</div>
+        <div class="section-desc">给业务负责人 / 数据专家看：健不健康、风险在哪、优化值不值、瓶颈在哪层。</div>
+        <div class="source-note">🔗 <b>数据来源：</b>准确率/badcase 来自<b>平台跑批结果（导入）</b>；归因 / 收益 / 回归 / 版本diff 由<b>本工具计算</b>。规则生成与抽取是两套系统，靠导入桥接。</div>
 
         <div class="kpi-row">
           <div class="kpi accent"><div class="k">整体抽取准确率</div><div class="v">88.4<small>%</small> <small style="font-size:13px">↑1.2</small></div></div>
-          <div class="kpi"><div class="k">条款健康度</div><div class="v" style="font-size:15px;padding-top:4px">
-            <span class="rg"><span class="d" style="background:var(--success)"></span>良 12</span>
-            <span class="rg"><span class="d" style="background:var(--warn)"></span>中 5</span>
-            <span class="rg"><span class="d" style="background:var(--danger)"></span>差 2</span>
-          </div></div>
-          <div class="kpi"><div class="k">本周优化净收益</div><div class="v" style="color:var(--success)">+44<small> 个 badcase</small></div></div>
+          <div class="kpi"><div class="k">条款健康度</div><div class="v" style="font-size:15px;padding-top:4px"><span class="rg"><span class="d" style="background:var(--success)"></span>良 12</span><span class="rg"><span class="d" style="background:var(--warn)"></span>中 5</span><span class="rg"><span class="d" style="background:var(--danger)"></span>差 2</span></div></div>
+          <div class="kpi"><div class="k">本周优化净收益</div><div class="v" style="color:var(--success)">+44<small> badcase</small></div></div>
           <div class="kpi"><div class="k">回归守护</div><div class="v" style="color:var(--success)">0<small> 条款被改坏</small></div></div>
         </div>
 
         <div class="two-col">
           <div class="card card-pad">
-            <h3>风险条款 TOP <span class="hint">· 准确率最低 / 下降最快，点"立即优化"直达工作台</span></h3>
-            <div class="risk-row low"><span class="rv">68%</span><div class="rn">违约金 <span class="tag red">↓3.2</span></div><button class="btn sm primary" onclick="go('workbench')">立即优化</button></div>
-            <div class="risk-row low"><span class="rv">73%</span><div class="rn">付款支持文档 <span class="tag amber">↓1.1</span></div><button class="btn sm primary" onclick="go('workbench')">立即优化</button></div>
-            <div class="risk-row mid"><span class="rv">79%</span><div class="rn">争议解决 <span class="tag amber">持平</span></div><button class="btn sm">分析</button></div>
-            <div class="risk-row mid"><span class="rv">81%</span><div class="rn">保密条款 <span class="tag amber">↓0.5</span></div><button class="btn sm">分析</button></div>
+            <h3>风险条款 TOP <span class="hint">· 点"立即优化"直达工作页</span></h3>
+            <div class="risk-row low"><span class="rv">68%</span><div class="rn">违约金 <span class="tag red">↓3.2</span> <span class="tag purple">销售</span></div><button class="btn sm primary" onclick="openDetail('违约金')">立即优化</button></div>
+            <div class="risk-row low"><span class="rv">71%</span><div class="rn">付款里程碑 <span class="tag red">↓2.1</span> <span class="tag amber">工程</span></div><button class="btn sm primary" onclick="openDetail('付款里程碑')">立即优化</button></div>
+            <div class="risk-row mid"><span class="rv">73%</span><div class="rn">付款支持文档 <span class="tag amber">↓1.1</span> <span class="tag indigo">采购</span></div><button class="btn sm primary" onclick="openDetail('付款支持文档')">立即优化</button></div>
+            <div class="risk-row mid"><span class="rv">79%</span><div class="rn">争议解决 <span class="tag amber">持平</span> <span class="tag purple">销售</span></div><button class="btn sm">分析</button></div>
           </div>
           <div class="card card-pad">
-            <h3>系统瓶颈 <span class="hint">· badcase 5 类归因占比</span></h3>
+            <h3>系统瓶颈 <span class="hint">· badcase 5 类归因（本工具算）</span></h3>
             <div class="bar-h"><span class="lbl">BOM 规则问题</span><div class="bar-track"><div class="bar-fill" style="width:41%;background:var(--danger)">41%</div></div></div>
             <div class="bar-h"><span class="lbl">召回问题</span><div class="bar-track"><div class="bar-fill" style="width:32%;background:var(--warn)">32%</div></div></div>
             <div class="bar-h"><span class="lbl">大模型推理</span><div class="bar-track"><div class="bar-fill" style="width:18%;background:var(--primary)">18%</div></div></div>
             <div class="bar-h"><span class="lbl">混合 / Prompt</span><div class="bar-track"><div class="bar-fill" style="width:9%;background:var(--teal)">9%</div></div></div>
-            <div class="callout">📌 <b>结论：主要瓶颈在"规则层"(41%)</b>——资源应投向规则编排（本工具主业），而非换模型。</div>
+            <div class="callout amber">📌 <b>主要瓶颈在"规则层"(41%)</b>——资源应投向规则编排（本工具主业），而非换模型。</div>
           </div>
         </div>
 
         <div class="card card-pad">
-          <h3>最近优化收益 <span class="hint">· 每次改动的修复 / 回归 / 净收益</span></h3>
+          <h3>最近优化收益 <span class="hint">· 每次改动的修复 / 回归 / 净收益（平台导入结果 diff）</span></h3>
           <table class="set-table">
-            <thead><tr><th>时间</th><th>条款</th><th>版本</th><th>修复 badcase</th><th>引入回归</th><th>净收益</th><th>操作人</th></tr></thead>
+            <thead><tr><th>时间</th><th>条款</th><th>业务域</th><th>版本</th><th>修复</th><th>回归</th><th>净收益</th><th>操作人</th></tr></thead>
             <tbody>
-              <tr><td>06-27</td><td>合同金额</td><td>v3→v4</td><td><span style="color:var(--success);font-weight:600">+47</span></td><td><span style="color:var(--danger)">-3</span></td><td><b style="color:var(--success)">+44</b></td><td>林大雨</td></tr>
-              <tr><td>06-26</td><td>甲方</td><td>v1→v2</td><td><span style="color:var(--success);font-weight:600">+22</span></td><td><span style="color:var(--danger)">-1</span></td><td><b style="color:var(--success)">+21</b></td><td>杨力</td></tr>
-              <tr><td>06-25</td><td>付款方式</td><td>v1→v2</td><td><span style="color:var(--success);font-weight:600">+15</span></td><td><span style="color:var(--danger)">0</span></td><td><b style="color:var(--success)">+15</b></td><td>林大雨</td></tr>
+              <tr><td>06-27</td><td>合同金额</td><td><span class="tag indigo">采购</span></td><td>v3→v4</td><td><span style="color:var(--success);font-weight:600">+47</span></td><td><span style="color:var(--danger)">-3</span></td><td><b style="color:var(--success)">+44</b></td><td>林大雨</td></tr>
+              <tr><td>06-26</td><td>甲方</td><td><span class="tag purple">销售</span></td><td>v1→v2</td><td><span style="color:var(--success);font-weight:600">+22</span></td><td><span style="color:var(--danger)">-1</span></td><td><b style="color:var(--success)">+21</b></td><td>杨力</td></tr>
+              <tr><td>06-25</td><td>服务期限</td><td><span class="tag teal">服务</span></td><td>v1→v2</td><td><span style="color:var(--success);font-weight:600">+15</span></td><td><span style="color:var(--danger)">0</span></td><td><b style="color:var(--success)">+15</b></td><td>林大雨</td></tr>
             </tbody>
           </table>
-          <div class="callout" style="background:var(--warn-soft);border-color:#fcd34d;color:#92400e">💡 <b>「付款支持文档」准确率持续偏低（73%）</b>——测试集分析：里程碑类样本占比仅 8%，建议补充该类样本后再优化。<button class="btn sm" style="margin-left:10px" onclick="go('workbench')">去优化</button></div>
+          <div class="callout amber">💡 <b>「付款支持文档」准确率持续偏低（73%）</b>——测试集分析：里程碑类样本占比仅 8%，建议补充该类样本后再优化。<button class="btn sm" style="margin-left:10px" onclick="openDetail('付款支持文档')">去优化</button></div>
         </div>
       </section>
 
-      <!-- ===== SETTINGS ===== -->
+      <!-- SETTINGS -->
       <section class="view" id="view-settings">
         <div class="section-title">设置</div>
-        <div class="section-desc">脱敏规则（出网自动应用）与模型配置。脱敏不再是独立工具，而是数据出网前的自动步骤。</div>
-
+        <div class="section-desc">脱敏规则（出网自动应用）与模型配置。</div>
         <div class="card card-pad" style="margin-bottom:14px">
           <h3>脱敏规则 <span class="tag teal" style="margin-left:6px">出网自动</span></h3>
           <table class="set-table">
             <thead><tr><th>规则</th><th>类别</th><th>策略</th><th>启用</th></tr></thead>
             <tbody>
-              <tr><td>公司名</td><td><span class="tag indigo">NER</span></td><td>替换为 公司A / 公司B（按角色）</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
-              <tr><td>金额</td><td><span class="tag gray">内置</span></td><td>替换为【金额_1】【金额_2】</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
+              <tr><td>公司名</td><td><span class="tag indigo">NER</span></td><td>替换为公司A/B（按角色）</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
+              <tr><td>金额</td><td><span class="tag gray">内置</span></td><td>替换为【金额_1】</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
               <tr><td>人名</td><td><span class="tag indigo">NER</span></td><td>替换为【人名_1】</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
-              <tr><td>联系方式</td><td><span class="tag gray">内置</span></td><td>手机号/邮箱掩码</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
-              <tr><td>证件号</td><td><span class="tag gray">内置</span></td><td>保留首3尾4</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
+              <tr><td>联系方式 / 证件号</td><td><span class="tag gray">内置</span></td><td>掩码处理</td><td><div class="switch on" onclick="this.classList.toggle('on')"></div></td></tr>
             </tbody>
           </table>
         </div>
-
         <div class="card card-pad" style="margin-bottom:14px">
-          <h3>模型配置 <span class="hint">· 各阶段可分温度</span></h3>
+          <h3>模型配置 <span class="hint">· 各阶段分温度</span></h3>
           <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px">
             <div class="field"><label>Provider / 模型</label><input class="inp" value="GLM · glm-5"></div>
-            <div class="field"><label>API Key</label><input class="inp" type="password" value="••••••••••••"></div>
-            <div class="field"><label>Stage1 定义+规则 温度（收敛）</label><input class="inp" value="0.2"></div>
-            <div class="field"><label>Stage2 召回画像 温度（发散）</label><input class="inp" value="0.5"></div>
+            <div class="field"><label>API Key</label><input class="inp" type="password" value="••••••••••"></div>
+            <div class="field"><label>Stage1 定义+规则（收敛）</label><input class="inp" value="0.2"></div>
+            <div class="field"><label>Stage2 召回画像（发散）</label><input class="inp" value="0.5"></div>
           </div>
         </div>
-
         <div class="card card-pad">
           <h3>Copilot 助手 <span class="tag gray">规划中</span></h3>
-          <div class="muted" style="font-size:13px;line-height:1.8">核心三阶段 + 工作台跑顺后，再上线「侧边 Copilot」（不单列模块）：<br>
-          · 自然语言优化："把违约金最近漏抽的 5 条列出来" → 自动查 badcase+trace+归因，建议改哪条规则<br>
-          · 解释答疑："为什么争议解决准确率掉了？" · 批量："把这 10 个低准确率条款各生成一版建议"<br>
-          技术选型倾向 LangGraph（状态机 + 人审打断）。</div>
+          <div class="muted" style="font-size:13px;line-height:1.8">核心三阶段 + 工作台跑顺后，再上线「侧边 Copilot」（不单列模块）：自然语言优化 / 解释答疑 / 批量优化。技术选型倾向 LangGraph（状态机 + 人审打断）。</div>
         </div>
       </section>
 
-      <div class="footer-note">💡 重构原型 v2（feature_lindayu）：信息架构从 9 入口收敛为 3（工作台 / 质量大盘 / 设置）；上传与脱敏内化；数据运营升级为"质量与风险大盘"。静态可点击：左侧导航、条款卡、风险行按钮。</div>
+      <div class="footer-note">💡 重构原型 v3：工作台=搜索+业务域分组+列表/工作页分离；大盘标注数据来源（平台导入+本工具归因）；脱敏内化；信息架构 3 入口（工作台/大盘/设置）。</div>
     </div>
   </main>
 </div>
-
 <script>
-const titles={workbench:["条款工作台","/ 一个条款从生成到优化的全流程"],dashboard:["质量与风险大盘","/ 健康度 · 风险 · 收益 · 瓶颈"],settings:["设置","/ 脱敏规则 · 模型配置"]};
+const titles={workbench:["条款工作台","/ 浏览 · 搜索 · 按业务域分组"],dashboard:["质量与风险大盘","/ 健康度 · 风险 · 收益 · 瓶颈"],settings:["设置","/ 脱敏规则 · 模型配置"],detail:["条款工作页","/ 条款工作台"]};
 function go(v){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
-  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+(v==='workbench'?'workbench':v)));
+  if(v==='workbench'){document.getElementById('view-workbench').classList.add('active');document.getElementById('view-detail').classList.remove('active')}
   const t=titles[v]||["",""];document.getElementById('title').textContent=t[0];document.getElementById('crumb').textContent=t[1];
   document.querySelector('.content').scrollTop=0;
 }
 document.getElementById('nav').addEventListener('click',e=>{const i=e.target.closest('.nav-item');if(i)go(i.dataset.view)});
-document.getElementById('clauseList').addEventListener('click',e=>{
-  const c=e.target.closest('.clause-card');if(!c)return;
-  document.querySelectorAll('.clause-card').forEach(x=>x.classList.remove('active'));
-  c.classList.add('active');
-  document.getElementById('curClause').textContent=c.dataset.c;
+let curDomain='all';
+document.getElementById('domainChips').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  document.querySelectorAll('#domainChips .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');curDomain=c.dataset.d;filterList();
 });
-function runFlow(){
-  const btn=event.target;const orig=btn.innerHTML;btn.innerHTML='⏳ 三阶段跑制中…';btn.disabled=true;
-  setTimeout(()=>{btn.innerHTML='✓ 完成，已预生成 v4';btn.style.background='var(--success)';setTimeout(()=>{btn.innerHTML=orig;btn.disabled=false;btn.style.background=''},1800)},1200);
+function filterList(){
+  const q=(document.getElementById('q').value||'').trim().toLowerCase();
+  document.querySelectorAll('#clauseGrid .cc').forEach(card=>{
+    const dom=card.dataset.d, k=(card.dataset.k||'').toLowerCase();
+    const domOk=curDomain==='all'||curDomain===dom;
+    const qOk=!q||k.includes(q);
+    card.style.display=(domOk&&qOk)?'':'none';
+  });
 }
+function openDetail(name){
+  document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  document.getElementById('view-detail').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelector('.nav-item[data-view="workbench"]').classList.add('active');
+  document.getElementById('d-name').textContent=name;
+  document.getElementById('title').textContent='条款工作页';document.getElementById('crumb').textContent='/ '+name;
+  document.querySelector('.content').scrollTop=0;
+}
+document.getElementById('clauseGrid').addEventListener('click',e=>{const c=e.target.closest('.cc');if(c){const n=c.querySelector('.cn').textContent;openDetail(n)}});
+function runFlow(ev){const b=ev.target;const o=b.innerHTML;b.innerHTML='⏳ 三阶段跑制中…';b.disabled=true;setTimeout(()=>{b.innerHTML='✓ 完成，已预生成 v4';b.style.background='var(--success)';setTimeout(()=>{b.innerHTML=o;b.disabled=false;b.style.background=''},1600)},1100)}
 </script>
 </body>
 </html>
