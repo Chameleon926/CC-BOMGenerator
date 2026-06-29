@@ -84,24 +84,34 @@ ingest(数据加载) → anonymize(脱敏) → generate(BOM生成) → diagnose(
 
 ```
 CC-BOMGenerator/
-├─ CLAUDE.md
-├─ .gitignore / .env.example / requirements.txt
+├─ backend/                    # Python 后端（FastAPI）
+│  ├─ src/cc_bom_generator/
+│  │  ├─ contracts/            # Pydantic 契约（已定义 6 个文件）
+│  │  ├─ nodes/                # ingest/anonymize/generate/diagnose/evaluate
+│  │  ├─ db/                   # SQLAlchemy + Alembic
+│  │  └─ llm/                  # LLM 客户端
+│  ├─ requirements.txt
+│  └─ alembic/
+├─ frontend/                   # Vue 前端
+│  ├─ src/
+│  │  ├─ views/                # 条款工作台/调优成效/设置
+│  │  ├─ components/           # 复用组件
+│  │  ├─ api/                  # 后端接口调用
+│  │  └─ router/               # 路由
+│  ├─ package.json
+│  └─ vite.config.ts           # 代理 /api → backend:8000
 ├─ config/
-│  └─ llm.yaml              # 模型配置（gitignore，各自填）
-├─ prompts/                 # 提示词（纯文本 + {{var}}，与代码分离）
-├─ quick_poc/               # PoC 验证代码（已冻结）
-├─ src/cc_bom_generator/    # 正式产品代码
-│  ├─ contracts/            # Pydantic 契约（已定义 6 个文件）
-│  ├─ nodes/                # 各节点实现（待开发）
-│  ├─ db/                   # SQLAlchemy + Alembic（待开发）
-│  ├─ llm/                  # LLM 客户端（待开发）
-│  └─ ui/                   # Streamlit 前端（待开发）
+│  └─ llm.yaml                 # 模型配置（gitignore，各自填）
+├─ prompts/                    # 提示词（纯文本 + {{var}}，与代码分离）
+├─ quick_poc/                  # PoC 验证代码（已冻结）
 ├─ docs/
-│  ├─ design/               # 设计文档 HTML（业务/技术/Agent/原型）
-│  ├─ 开发文档-协作指南.md
+│  ├─ design/                  # 设计文档 HTML
+│  ├─ progress.md              # 开发进度
 │  └─ 功能模块拆分-按文件粒度.md
-├─ tests/                   # 单元测试
-└─ data/samples/            # 脱敏样例
+├─ CLAUDE.md
+├─ .gitignore
+├─ README.md
+└─ requirements.txt            # 公共依赖（可选）
 ```
 
 ---
@@ -109,14 +119,15 @@ CC-BOMGenerator/
 ## 🧰 技术栈
 
 - **语言**：Python 3.11+
-- **前端**：Streamlit（纯 Python 写界面）
+- **后端**：FastAPI
+- **前端**：Vue 3 + Vite
 - **脱敏**：Presidio（本地 NER）+ 规则替换
 - **LLM 客户端**：OpenAI 兼容（可配 api_key + base_url + 模型）
 - **数据库**：MySQL（utf8mb4）+ JSON 列；**SQLAlchemy ORM + Alembic 迁移**
 - **DB 驱动**：PyMySQL
 - **契约**：Pydantic v2
-- **测试**：pytest
-- **IDE**：PyCharm（`.idea/` 已 gitignore）
+- **测试**：pytest / vitest
+- **IDE**：PyCharm / VSCode（`.idea/` 已 gitignore）
 
 ---
 

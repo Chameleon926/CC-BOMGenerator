@@ -54,3 +54,8 @@ data/private/
 poc/output/
 quick_poc/output/
 quick_poc/data/imported/
+
+# ===== Vue 前端 =====
+node_modules/
+frontend/dist/
+frontend/.vite/
