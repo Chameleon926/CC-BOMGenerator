@@ -1,0 +1,1 @@
+"""cc_bom_generator - 语义 BOM 规则编译器与自动调优平台。"""
