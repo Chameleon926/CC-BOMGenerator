@@ -126,7 +126,7 @@
     <nav class="nav" id="nav">
       <div class="nav-group">核心</div>
       <div class="nav-item active" data-view="workbench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>条款工作台</div>
-      <div class="nav-item" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>质量大盘 <span class="badge">2</span></div>
+      <div class="nav-item" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>调优成效 <span class="badge">2</span></div>
       <div class="nav-group">系统</div>
       <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9 2 2 0 11-2.8 2.8 1.7 1.7 0 00-2.9 1.2V21a2 2 0 11-4 0 1.7 1.7 0 00-2.9-1.2 2 2 0 11-2.8-2.8 1.7 1.7 0 00-.3-2.9H3a2 2 0 110-4 1.7 1.7 0 001.5-2.9 2 2 0 112.8-2.8 1.7 1.7 0 002.9-.3V3a2 2 0 114 0 1.7 1.7 0 002.9.3 2 2 0 112.8 2.8 1.7 1.7 0 00.3 2.9H21a2 2 0 110 4z"/></svg>设置</div>
     </nav>
@@ -196,10 +196,22 @@
           <button class="btn primary" style="width:100%;justify-content:center" onclick="runFlow(event)">⚡ 一键生成 / 优化（三阶段自动跑）</button>
         </div>
 
+        <div class="card card-pad" style="margin-bottom:14px">
+          <h3>② 当前问题 <span class="hint">· 本次要修的 badcase（来自导入的跑批结果，仅 optimize 显示）</span></h3>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+            <span class="tag amber">漏抽 ×2</span><span class="tag red">误抽 ×2</span><span class="faint" style="font-size:12px">共 4 条（是否匹配=否）</span>
+          </div>
+          <div class="risk-row mid" style="margin-bottom:8px"><span class="tag amber">漏抽</span><div class="rn" style="font-weight:500">"签署确认书/报告后付款"流程类，规则未覆盖"签署…后"绑定 <span class="faint">→ 拟放宽匹配规则</span></div></div>
+          <div class="risk-row mid" style="margin-bottom:8px"><span class="tag amber">漏抽</span><div class="rn" style="font-weight:500">"根据采购单及发票付款"，未把采购单纳入交易凭证 <span class="faint">→ 拟补充枚举</span></div></div>
+          <div class="risk-row low" style="margin-bottom:8px"><span class="tag red">误抽</span><div class="rn" style="font-weight:500">仅引用"以框架协议为准"，无具体文档类型 <span class="faint">→ 拟加拦截规则</span></div></div>
+          <div class="risk-row low" style="margin-bottom:0"><span class="tag red">误抽</span><div class="rn" style="font-weight:500">验收材料清单未与付款绑定（属验收流程，非付款前提） <span class="faint">→ 拟加拦截规则</span></div></div>
+          <div class="callout teal" style="margin:12px 0 0">👆 这些就是本次优化要解决的问题；下方生成结果会针对它们改规则/画像。<b>归因是 🟡 AI 产出，请人审。</b></div>
+        </div>
+
         <div class="detail-cols">
           <div>
             <div class="card card-pad" style="margin-bottom:14px">
-              <h3>② 生成结果 <span class="hint">· 定义+规则 → 召回画像 → 自检</span></h3>
+              <h3>③ 生成结果 <span class="hint">· 定义+规则 → 召回画像 → 自检</span></h3>
               <div class="stage-flow">
                 <div class="stage"><div class="st">Stage 1 · 定义+规则</div><div class="sb">付款支持文档：供应商提交的全套付款证明依据（发票/PO/验收/里程碑）。拦截：仅动作无具体文档。匹配：给出≥1种文档类型。</div></div>
                 <div class="stage"><div class="st">Stage 2 · 召回画像（派生）</div><div class="sb">关键词：付款支持文档·增值税发票·PO·验收证明·付款里程碑；章节：付款条款·支付与结算；语义查询×3。</div></div>
@@ -209,7 +221,7 @@
           </div>
           <div>
             <div class="card card-pad">
-              <h3>③ 版本历史 <span class="hint">· 准确率演进，可回滚</span></h3>
+              <h3>④ 版本历史 <span class="hint">· 准确率演进，可回滚</span></h3>
               <div class="vlist">
                 <div class="vitem current"><div class="vhead"><span class="vnum">v4（建议）</span><span class="tag green">预生成</span><span class="faint">预期 89%</span></div><div class="vnote">放宽剔除付款日；新增里程碑+排程覆盖。</div></div>
                 <div class="vitem"><div class="vhead"><span class="vnum">v3</span><span class="faint">06-26 · 73%</span></div><div class="vnote">首次接入语义去重标注。</div></div>
@@ -223,8 +235,8 @@
 
       <!-- DASHBOARD -->
       <section class="view" id="view-dashboard">
-        <div class="section-title">质量与风险大盘</div>
-        <div class="section-desc">给业务负责人 / 数据专家看：健不健康、风险在哪、优化值不值、瓶颈在哪层。</div>
+        <div class="section-title">调优成效</div>
+        <div class="section-desc">本工具 BOM 调优的产出成效：调了哪些条款、准确率怎么变、修复/回归/净收益、归因瓶颈。<b>全业务的总体质量总览是【质量运营】的职责，本视图只看本工具调优的产出，不与之重复</b>。</div>
         <div class="source-note">🔗 <b>数据来源：</b>准确率/badcase 来自<b>平台跑批结果（导入）</b>；归因 / 收益 / 回归 / 版本diff 由<b>本工具计算</b>。规则生成与抽取是两套系统，靠导入桥接。</div>
         <div class="callout teal" style="margin-top:0;margin-bottom:14px">⚖️ <b>本工具不预设"优良中差"分级</b>——任何分类阈值（如"待优化线""风险线"）必须由业务领导定义并检验后才上线；下图仅展示<b>事实数据</b>（准确率/趋势/归因占比）与<b>事实排序</b>（最低/下降最多），不做主观评级。</div>
 
@@ -303,7 +315,7 @@
   </main>
 </div>
 <script>
-const titles={workbench:["条款工作台","/ 浏览 · 搜索 · 按业务域分组"],dashboard:["质量与风险大盘","/ 健康度 · 风险 · 收益 · 瓶颈"],settings:["设置","/ 脱敏规则 · 模型配置"],detail:["条款工作页","/ 条款工作台"]};
+const titles={workbench:["条款工作台","/ 浏览 · 搜索 · 按业务域分组"],dashboard:["调优成效","/ 调优产出 · 收益 · 归因（不与质量运营的全局质量视图重复）"],settings:["设置","/ 脱敏规则 · 模型配置"],detail:["条款工作页","/ 条款工作台"]};
 function go(v){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+(v==='workbench'?'workbench':v)));
