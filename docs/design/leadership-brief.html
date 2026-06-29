@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合同要素抽取 · 规则自动生成与调优</title>
+<style>
+  :root{--primary:#4f46e5;--primary-2:#6366f1;--ink:#0f172a;--ink-2:#334155;--muted:#64748b;--line:#e6e8ee;--bg:#fff;--surface:#f8fafc;--green:#059669;--green-bg:#ecfdf5;--amber:#d97706;--amber-bg:#fffbeb;--red:#dc2626;--red-bg:#fef2f2;--blue:#2563eb;--blue-bg:#eff6ff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
+  .deck{position:relative;width:100vw;height:100vh;overflow:hidden}
+  .slide{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;padding:6vh 9vw;background:var(--bg)}
+  .slide.active{display:flex;animation:fade .35s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .eyebrow{font-size:13px;font-weight:600;color:var(--primary);letter-spacing:.04em;margin-bottom:18px}
+  h1{font-size:46px;line-height:1.2;letter-spacing:-.02em;font-weight:800;margin-bottom:18px}
+  h2{font-size:34px;line-height:1.25;letter-spacing:-.015em;font-weight:750;margin-bottom:10px}
+  .lead{font-size:19px;color:var(--muted);max-width:760px;margin-bottom:34px;line-height:1.6}
+  .small{font-size:13px;color:var(--muted)}
+  /* pain */
+  .pain{display:flex;gap:18px;margin-top:8px}
+  .pain .p{flex:1;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:12px;padding:20px}
+  .pain .p .n{font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px}
+  .pain .p h4{font-size:17px;margin-bottom:8px}
+  .pain .p div{font-size:14px;color:var(--ink-2);line-height:1.6}
+  .quote{margin-top:26px;font-size:15px;color:var(--ink-2);background:var(--amber-bg);border:1px dashed #fcd34d;border-radius:10px;padding:13px 16px}
+  /* bullets */
+  ul.big{list-style:none;margin-top:6px}
+  ul.big li{font-size:18px;line-height:1.55;margin-bottom:14px;padding-left:30px;position:relative;color:var(--ink-2)}
+  ul.big li::before{content:"";position:absolute;left:0;top:11px;width:14px;height:14px;border-radius:4px;background:var(--primary)}
+  ul.big li b{color:var(--ink)}
+  /* evidence */
+  .ev{display:flex;gap:24px;align-items:stretch;margin:10px 0 26px}
+  .ev .box{flex:1;border-radius:14px;padding:26px;text-align:center;border:1px solid var(--line)}
+  .ev .box.before{background:var(--surface)}
+  .ev .box.after{background:var(--green-bg);border-color:#a7f3d0}
+  .ev .box .lbl{font-size:14px;color:var(--muted);margin-bottom:8px}
+  .ev .box .num{font-size:54px;font-weight:800;line-height:1}
+  .ev .box.before .num{color:var(--amber)}
+  .ev .box.after .num{color:var(--green)}
+  .ev .arrow{display:flex;align-items:center;font-size:34px;color:var(--muted)}
+  .note{font-size:13.5px;color:var(--muted);background:var(--surface);border-radius:9px;padding:11px 15px;border:1px solid var(--line)}
+  /* stages */
+  .stages{display:flex;gap:14px;margin:8px 0 22px}
+  .stages .s{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .stages .s .st{font-size:12px;font-weight:700;color:var(--primary);margin-bottom:7px}
+  .stages .s .sb{font-size:14px;color:var(--ink-2);line-height:1.55}
+  .cats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .cats .c{font-size:12.5px;padding:5px 11px;border-radius:7px;background:var(--blue-bg);color:var(--blue);font-weight:500}
+  /* cred */
+  .cred{display:flex;gap:18px;margin:6px 0 22px}
+  .cred .col{flex:1;border:1px solid var(--line);border-radius:12px;padding:20px}
+  .cred .col.fact{background:var(--green-bg);border-color:#a7f3d0}
+  .cred .col.ai{background:var(--amber-bg);border-color:#fcd34d}
+  .cred .col h4{font-size:16px;margin-bottom:10px}
+  .cred .col.fact h4{color:var(--green)} .cred .col.ai h4{color:var(--amber)}
+  .cred .col .items{font-size:14px;color:var(--ink-2);line-height:1.7}
+  /* value */
+  .vals{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+  .vals .v{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .vals .v h4{font-size:16px;margin-bottom:6px;color:var(--primary)}
+  .vals .v div{font-size:14px;color:var(--ink-2);line-height:1.6}
+  /* nav */
+  .nav{position:fixed;bottom:24px;right:28px;display:flex;align-items:center;gap:14px;z-index:99}
+  .nav button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:18px;cursor:pointer;color:var(--ink-2);box-shadow:0 2px 8px rgba(15,23,42,.08)}
+  .nav button:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .counter{font-size:14px;color:var(--muted);font-weight:600;min-width:54px;text-align:center}
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--primary);transition:width .3s;z-index:99}
+  .cover-meta{font-size:14px;color:var(--muted);margin-top:30px}
+  .step-num{display:inline-block;font-size:13px;font-weight:700;color:var(--primary);background:#eef2ff;padding:3px 10px;border-radius:6px;margin-right:10px}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="deck" id="deck">
+
+  <!-- 1 封面 -->
+  <section class="slide active">
+    <div class="eyebrow">汇报 · 2026-06</div>
+    <h1>合同要素抽取<br>规则自动生成与调优</h1>
+    <p class="lead">语义 BOM 规则编译器 —— 把"手工写抽取规则"变成"测试集驱动、自动生成、可解释、可回归"的工程化能力。</p>
+    <div class="cover-meta">PoC 已通过真实条款验证 · 独立于抽取平台 · 不替代现有质量运营</div>
+  </section>
+
+  <!-- 2 痛点 -->
+  <section class="slide">
+    <div class="eyebrow">01 · 问题</div>
+    <h2>合同要素抽取调优，业务面临三难</h2>
+    <div class="pain">
+      <div class="p"><div class="n">难点 1</div><h4>诊断链路长</h4><div>Badcase 要进 Trace 手工逐条归因，判断是召回、规则还是模型问题，耗时且依赖个人经验。</div></div>
+      <div class="p"><div class="n">难点 2</div><h4>调优门槛高</h4><div>高度依赖长 Prompt 工程，业务人员难上手；改一处句式可能影响其他条款。</div></div>
+      <div class="p"><div class="n">难点 3</div><h4>回归难评估</h4><div>改了规则，不知是否把原本对的改坏；缺版本管理与前后对比，调优凭感觉。</div></div>
+    </div>
+    <div class="quote">本质痛点：调一个条款，要在平台、外部大模型、Excel 之间反复复制粘贴、手改提示词、凭感觉回归。</div>
+  </section>
+
+  <!-- 3 做了什么 -->
+  <section class="slide">
+    <div class="eyebrow">02 · 方案</div>
+    <h2>我们做了一个独立的「规则实验室」</h2>
+    <ul class="big">
+      <li><b>测试集驱动生成</b>：上传标注测试集，自动产出「语义 BOM」—— 业务定义 + 抽取规则 + 召回画像（关键词、语义查询、章节、正例）。</li>
+      <li><b>错例智能归因优化</b>：跑批后导入错例，自动 5 类归因，定向修订规则/画像。</li>
+      <li><b>版本化回归</b>：每版 BOM 快照 + 准确率前后对比（修复/回归/净收益），改好改差一目了然。</li>
+      <li><b>解耦轻量</b>：不直连抽取平台，靠导入导出桥接；不替代平台、不与质量运营重复。</li>
+    </ul>
+  </section>
+
+  <!-- 4 实测效果 -->
+  <section class="slide">
+    <div class="eyebrow">03 · 实测效果</div>
+    <h2>真实条款验证：自动生成 优于 业务手写</h2>
+    <div class="ev">
+      <div class="box before"><div class="lbl">业务手写 BOM</div><div class="num">52%</div><div class="small">准确率</div></div>
+      <div class="arrow">→</div>
+      <div class="box after"><div class="lbl">工具自动生成 BOM</div><div class="num">72%</div><div class="small">准确率（+20pp）</div></div>
+    </div>
+    <div class="note">验证条款：付款支持文档（采购合同域）。提升 +20 个百分点，且超过业务人员手写的 BOM。<b>说明：单条款 PoC，方法路径已验证，下一步在更多条款上推广验证。</b></div>
+  </section>
+
+  <!-- 5 怎么工作 -->
+  <section class="slide">
+    <div class="eyebrow">04 · 工作原理</div>
+    <h2>两阶段生成 + 自检 + 归因优化</h2>
+    <div class="stages">
+      <div class="s"><div class="st">阶段 1</div><div class="sb"><b>语义定义 + 抽取规则</b><br>从测试集归纳条款本质与抽取边界（含拦截/匹配规则）。</div></div>
+      <div class="s"><div class="st">阶段 2</div><div class="sb"><b>召回画像（派生）</b><br>由定义派生关键词、语义查询、章节、正例，用于召回。</div></div>
+      <div class="s"><div class="st">阶段 3</div><div class="sb"><b>规则自检</b><br>验证正例能抽、反例能拦，抓自相矛盾与过拟合。</div></div>
+    </div>
+    <div class="small" style="margin-bottom:10px">优化时对错例做 5 类归因，定向修复：</div>
+    <div class="cats"><span class="c">召回问题</span><span class="c">BOM 规则问题</span><span class="c">大模型推理问题</span><span class="c">Prompt 模板待优化</span><span class="c">混合问题</span></div>
+    <div class="note">覆盖率阈值固定 80% 不可调 → 优化靠"让模型抽得更完整/更准"达标，不靠调阈值取巧。</div>
+  </section>
+
+  <!-- 6 可信度 -->
+  <section class="slide">
+    <div class="eyebrow">05 · 可信度</div>
+    <h2>不把 AI 草稿当事实</h2>
+    <div class="cred">
+      <div class="col fact"><h4>✓ 事实型（可直接信）</h4><div class="items">准确率、修复/回归数、版本对比 —— 来自平台跑分结果导入，确定性计算。</div></div>
+      <div class="col ai"><h4>⚠ AI 产出（待人审）</h4><div class="items">定义、规则、画像、归因 —— 标注"待复核"，经人工确认 + 规则自检后才采纳。</div></div>
+    </div>
+    <ul class="big" style="margin-top:6px">
+      <li><b>不预设"优良中差"评级</b>：分类阈值待业务确认后才上线，工具只展示事实数据。</li>
+      <li><b>可解释、可追溯、可回滚</b>：每条规则有依据，每个版本可回滚。</li>
+    </ul>
+  </section>
+
+  <!-- 7 价值 -->
+  <section class="slide">
+    <div class="eyebrow">06 · 价值</div>
+    <h2>降门槛、可解释、解耦</h2>
+    <div class="vals">
+      <div class="v"><h4>减少 Prompt 工程</h4><div>业务自助生成/优化规则，不再依赖手写长 Prompt。</div></div>
+      <div class="v"><h4>业务自助调优</h4><div>合同商务人员可自主维护条款规则，降低对技术依赖。</div></div>
+      <div class="v"><h4>可解释可追溯</h4><div>每条规则有依据，每次改动有记录，每版可回滚。</div></div>
+      <div class="v"><h4>解耦不侵入</h4><div>不改造平台，导入导出即用；不与质量运营重复。</div></div>
+    </div>
+  </section>
+
+  <!-- 8 下一步 -->
+  <section class="slide">
+    <div class="eyebrow">07 · 下一步</div>
+    <h2>推广验证 → 正式开发</h2>
+    <ul class="big">
+      <li><span class="step-num">Step 1</span><b>多条款批量验证</b>：把 52%→72% 的方法推广到更多条款，确认可复制性。</li>
+      <li><span class="step-num">Step 2</span><b>正式开发</b>：按技术设计文档落地（Streamlit + MySQL），支持批量、版本管理、质量看板。</li>
+      <li><span class="step-num">Step 3</span><b>对话 Copilot（后置）</b>：核心跑顺后，加侧边对话助手，自然语言查错例/归因/优化。</li>
+    </ul>
+    <div class="note">设计文档已就绪：业务设计 / 技术设计 / 对话 Agent 设计 / 功能拆解与可信度 / 交互原型。</div>
+  </section>
+
+</div>
+
+<div class="nav">
+  <button id="prev" title="上一页">‹</button>
+  <span class="counter" id="counter">1 / 8</span>
+  <button id="next" title="下一页">›</button>
+</div>
+
+<script>
+const slides=document.querySelectorAll('.slide');
+let i=0;
+function show(n){
+  i=Math.max(0,Math.min(slides.length-1,n));
+  slides.forEach((s,k)=>s.classList.toggle('active',k===i));
+  document.getElementById('counter').textContent=(i+1)+' / '+slides.length;
+  document.getElementById('progress').style.width=((i+1)/slides.length*100)+'%';
+}
+document.getElementById('next').onclick=()=>show(i+1);
+document.getElementById('prev').onclick=()=>show(i-1);
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')show(i+1);if(e.key==='ArrowLeft')show(i-1)});
+show(0);
+</script>
+</body>
+</html>
