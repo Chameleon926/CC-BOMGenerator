@@ -29,14 +29,15 @@ import pandas as pd
 import yaml
 
 COL_MAP = {
-    "doc_name": ["doc_name", "文档名称", "文档名"],
+    "doc_name": ["doc_name", "文档名称", "文档名", "文件名"],
     "doc_id": ["doc_id", "文档id", "文档编号"],
-    "block_code": ["block_code", "语义块编码", "语义块id", "条款编码"],
-    "block_name": ["block_name", "语义块名称", "语义块名", "条款名称", "条款名"],
+    "block_code": ["block_code", "语义块编码", "语义块id", "条款编码", "块/项编码", "块编码", "项编码"],
+    "block_name": ["block_name", "语义块名称", "语义块名", "条款名称", "条款名", "块/项名称", "块名称", "项名称"],
     "expected_value": ["expected_value", "期望值", "期望结果", "期望"],
     "actual_value": ["actual_value", "抽取值", "实际值", "实际结果", "抽取结果", "actual"],
     "match": ["是否匹配", "match", "匹配", "命中", "是否命中"],
     "similarity": ["相似度", "similarity", "相似", "覆盖率", "coverage"],
+    "reason": ["原因", "reason", "判定原因", "不匹配原因", "失败原因"],
     "text": ["text", "合同原文", "原文", "doc_text", "片段", "content"],
 }
 
@@ -131,6 +132,10 @@ def main():
                     sim = str(r[cols["similarity"]]).strip()
                     if sim:
                         bc["similarity"] = sim
+                if cols["reason"]:
+                    rsn = str(r[cols["reason"]]).strip()
+                    if rsn:
+                        bc["reason"] = rsn
                 bads.append(bc)
             data["badcases"] = bads
             bad_n = len(bads)

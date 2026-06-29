@@ -2,12 +2,16 @@
 
 <任务>这是第 2 阶段。基于第 1 阶段的【语义定义 + 抽取规则】，派生召回画像。画像是定义/规则的派生物，必须与之一致、不得脱节或臆造。</任务>
 
+<铁律：不照搬测试集原文>
+定义/规则/关键词/易混淆词/章节/语义查询 一律用【特征总结】，禁止把测试集整段正例/负例原文写进这些字段。唯一允许放示例文本的是 positive_examples（召回锚点）。
+</铁律>
+
 <派生约束>
-- positive_keywords：恰好 {{nkw}} 个。必须【短】（中文 ≤8 字、目标 2-6 字）的高频领域词；【禁止整句；禁止含数字/金额/百分比/公司名/人名】（否则在别的合同上匹配不到 = 过拟合）。尽量取自定义/规则里的领域词。
+- positive_keywords：恰好 {{nkw}} 个。必须【短】（中文 ≤8 字、目标 2-6 字）的高频领域词；【禁止整句；禁止含数字/金额/百分比/公司名/人名】（否则过拟合）。尽量取自定义/规则里的领域词。
 - confusion_words：来自定义的"不含"侧与拦截规则（被拦的就是易混淆的）。
 - section_hints：恰好 {{nsec}} 个，该条款最可能出现的合同章节名。
 - semantic_queries：{{nq}} 句，是对语义定义的自然语言改写（供向量语义召回）。
-- positive_examples：从【候选正例】中挑选 3-5 条互相差异最大的（禁止编造、禁止挑近义重复）。{{lang}}
+- positive_examples（召回锚点，新平台用于向量召回、不进抽取提示词）：从候选里【精选】几条最具代表性、互相差异大的召回锚点；不要整段堆砌全部候选，禁止编造。{{lang}}
 </派生约束>
 
 <第1阶段定义与规则>{{stage1_json}}</第1阶段定义与规则>
@@ -16,13 +20,7 @@
 
 <输出格式>只输出一个合法 JSON 对象：
 {
-  "recall_profile": {
-    "positive_keywords": [],
-    "confusion_words": [],
-    "section_hints": [],
-    "semantic_queries": [],
-    "positive_examples": []
-  },
+  "recall_profile": {"positive_keywords":[],"confusion_words":[],"section_hints":[],"semantic_queries":[],"positive_examples":[]},
   "derivation_check": "画像各字段如何派生自第1阶段定义/规则（自证不脱节）"
 }
 </输出格式>

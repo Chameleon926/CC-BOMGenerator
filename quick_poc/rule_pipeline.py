@@ -100,6 +100,8 @@ def fmt_badcases_rich(cases, fields=None):
         lines.append(f"  - {c.get('id', '?')}（{c.get('type', '?')}）：期望=[{c.get('expected', '')}] 实际=[{c.get('actual', '')}]"
                      + (f" 覆盖率/相似度=[{c.get('similarity')}]" if c.get("similarity") else ""))
         lines.append(f"      原文：{c.get('text', '')}")
+        if c.get("reason"):
+            lines.append(f"      平台原因：{c.get('reason')}")
         t = c.get("_trace_struct")
         if not t:
             lines.append("      [Trace] （未提供；只能判误抽/漏抽，类别低置信猜测）")
@@ -186,7 +188,9 @@ def gen_stage2_user(s1, d):
 def opt_stage2_user(s1, d):
     return render(load_prompt("opt_stage2"),
                   stage1_json=json.dumps(s1, ensure_ascii=False, indent=2),
-                  cands=fmt_cands(d.get("positive_candidates")), **recall_params(d))
+                  cands=fmt_cands(d.get("positive_candidates")),
+                  current_bom=d.get("current_bom") or "（无上一版 BOM）",
+                  **recall_params(d))
 
 
 def run_pipeline(client, data, mode):
@@ -322,7 +326,9 @@ def print_prompts(data, mode, data_path):
     s1 = s1_user(data)
     s2 = render(load_prompt("gen_stage2" if mode == "generate" else "opt_stage2"),
                 stage1_json="\n<<< 把 Stage 1 返回的 JSON 粘贴到这里 >>>\n",
-                cands=fmt_cands(data.get("positive_candidates")), **recall_params(data))
+                cands=fmt_cands(data.get("positive_candidates")),
+                current_bom=data.get("current_bom") or "（无上一版 BOM）",
+                **recall_params(data))
     s3 = render(load_prompt("verify"),
                 bom_json="\n<<< 把 Stage1+Stage2 合并后的完整 BOM JSON 粘贴到这里（第④步合并后再跑这步）>>>\n",
                 positives=fmt_cands(data.get("positive_candidates")),

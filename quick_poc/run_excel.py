@@ -49,6 +49,10 @@ def build_badcases(g, cols):
             sim = str(r[cols["similarity"]]).strip()
             if sim:
                 bc["similarity"] = sim
+        if cols["reason"]:
+            rsn = str(r[cols["reason"]]).strip()
+            if rsn:
+                bc["reason"] = rsn
         bads.append(bc)
     return bads
 
@@ -59,11 +63,18 @@ def main():
     ap.add_argument("--mode", choices=["generate", "optimize"], required=True,
                     help="generate=初始生成(只有期望值)；optimize=已跑优化(有实际值/是否匹配)")
     ap.add_argument("--api", action="store_true", help="调 config/llm.yaml 的模型（默认只生成提示词）")
+    ap.add_argument("--current-bom", help="optimize 时：上一版 BOM 的 _BOM_readable.md 文件路径（作为 current_bom 输入，保留其正例）")
     args = ap.parse_args()
 
     src = Path(args.excel)
     if not src.exists():
         sys.exit(f"✗ 找不到文件：{src}")
+    prev_bom = None
+    if args.current_bom:
+        cb = Path(args.current_bom)
+        if not cb.exists():
+            sys.exit(f"✗ 找不到 current-bom 文件：{cb}")
+        prev_bom = cb.read_text(encoding="utf-8")
     df = read_table(src).fillna("")
     cols = {k: find_col(df, v) for k, v in COL_MAP.items()}
     if not cols["expected_value"]:
@@ -103,7 +114,7 @@ def main():
 
         data = {
             "mode": args.mode, "clause": str(name), "block_code": str(code),
-            "current_bom": f"（由 {src.name} 导入；尚无既有规则）",
+            "current_bom": prev_bom or f"（由 {src.name} 导入；尚无既有规则）",
             "positive_candidates": cands,
             "keyword_count": 10, "section_count": 6, "query_count": 3,
         }
