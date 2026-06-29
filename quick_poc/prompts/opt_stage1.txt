@@ -6,7 +6,7 @@
 
 <约束>
 - 必须提炼泛化特征，严禁具体公司名/金额/百分比/人名/日期。
-- semantic_definition 写清【包含】与【不含(边界)】两段。
+- semantic_definition 用自然语言写清（"X 是指……"）；若需排除易混淆相邻概念，在末尾自然说明（如"注意：XX 不属于本条款"），不要用【包含】【不含】标签。
 - 诊断优先用 Trace 证据：原文窗口判"召回问题"、reasoning 判"大模型推理问题"、提示词输入输出判"Prompt模板待优化"、规则本身判"BOM问题"、多因并存判"混合问题"；无 Trace 则只能判误抽/漏抽、低置信猜类别。
 - 每条诊断给 fix_target：修规则填 rules、修画像填 recall_profile、两者都改填 both（recall_profile/both 的会在第 2 阶段落实）。
 </约束>
@@ -28,7 +28,7 @@
      "suggested_fix": "具体修哪条规则/画像",
      "fix_target": "rules|recall_profile|both"}
   ],
-  "semantic_definition": "【包含】...；【不含】...",
+  "semantic_definition": "（自然语言定义；末尾可附排除说明）",
   "extraction_rules": {
     "absolute_interception_rules": [{"rule": "...", "fixes": "针对哪个误抽"}],
     "core_match_rules": [{"rule": "...", "fixes": "针对哪个漏抽"}]
