@@ -151,15 +151,16 @@
         <div class="section-desc">搜索/按业务域筛选条款 → 点开进入该条款的工作页（上传→自动判场景→一键生成/优化）。</div>
         <div class="toolbar">
           <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="q" placeholder="搜索条款/要素名称、编码、关键词…" oninput="filterList()"></div>
+          <select id="domainSel" onchange="filterList()" style="padding:8px 12px;border:1px solid var(--border);border-radius:9px;font-size:13px;background:#fff;color:var(--ink);font-family:inherit;cursor:pointer">
+            <option value="all">全部业务域</option>
+            <option value="采购">采购合同</option>
+            <option value="销售">销售合同</option>
+            <option value="服务">服务合同</option>
+            <option value="工程">工程合同</option>
+            <option value="框架">框架协议</option>
+          </select>
+          <span class="faint" style="font-size:12.5px;white-space:nowrap">共 9 个条款</span>
           <button class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M10 18h4"/></svg>排序：准确率</button>
-        </div>
-        <div class="domain-chips" id="domainChips">
-          <span class="chip on" data-d="all">全部 9</span>
-          <span class="chip" data-d="采购">采购合同 3</span>
-          <span class="chip" data-d="销售">销售合同 2</span>
-          <span class="chip" data-d="服务">服务合同 2</span>
-          <span class="chip" data-d="工程">工程合同 1</span>
-          <span class="chip" data-d="框架">框架协议 1</span>
         </div>
         <div class="clause-grid" id="clauseGrid">
           <!-- 采购 -->
@@ -329,13 +330,10 @@ function go(v){
   document.querySelector('.content').scrollTop=0;
 }
 document.getElementById('nav').addEventListener('click',e=>{const i=e.target.closest('.nav-item');if(i)go(i.dataset.view)});
-let curDomain='all';
-document.getElementById('domainChips').addEventListener('click',e=>{
-  const c=e.target.closest('.chip');if(!c)return;
-  document.querySelectorAll('#domainChips .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');curDomain=c.dataset.d;filterList();
-});
 function filterList(){
   const q=(document.getElementById('q').value||'').trim().toLowerCase();
+  const sel=document.getElementById('domainSel');
+  const curDomain=sel?sel.value:'all';
   document.querySelectorAll('#clauseGrid .cc').forEach(card=>{
     const dom=card.dataset.d, k=(card.dataset.k||'').toLowerCase();
     const domOk=curDomain==='all'||curDomain===dom;
