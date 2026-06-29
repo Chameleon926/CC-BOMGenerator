@@ -76,10 +76,10 @@
 
   <!-- 1 封面 -->
   <section class="slide active">
-    <div class="eyebrow">汇报 · 2026-06</div>
+    <div class="eyebrow">方案评审 · 2026-06</div>
     <h1>合同要素抽取<br>规则自动生成与调优</h1>
     <p class="lead">语义 BOM 规则编译器 —— 把"手工写抽取规则"变成"测试集驱动、自动生成、可解释、可回归"的工程化能力。</p>
-    <div class="cover-meta">PoC 已通过真实条款验证 · 独立于抽取平台 · 不替代现有质量运营</div>
+    <div class="cover-meta"><b>当前阶段：方案评审</b>（已完成 PoC 验证 + 完整设计，尚未开发产品）· 独立于抽取平台 · 不替代质量运营</div>
   </section>
 
   <!-- 2 痛点 -->
@@ -97,7 +97,7 @@
   <!-- 3 做了什么 -->
   <section class="slide">
     <div class="eyebrow">02 · 方案</div>
-    <h2>我们做了一个独立的「规则实验室」</h2>
+    <h2>方案：构建一个独立的「规则实验室」</h2>
     <ul class="big">
       <li><b>测试集驱动生成</b>：上传标注测试集，自动产出「语义 BOM」—— 业务定义 + 抽取规则 + 召回画像（关键词、语义查询、章节、正例）。</li>
       <li><b>错例智能归因优化</b>：跑批后导入错例，自动 5 类归因，定向修订规则/画像。</li>
@@ -108,14 +108,28 @@
 
   <!-- 4 实测效果 -->
   <section class="slide">
-    <div class="eyebrow">03 · 实测效果</div>
-    <h2>真实条款验证：自动生成 优于 业务手写</h2>
-    <div class="ev">
-      <div class="box before"><div class="lbl">业务手写 BOM</div><div class="num">52%</div><div class="small">准确率</div></div>
-      <div class="arrow">→</div>
-      <div class="box after"><div class="lbl">工具自动生成 BOM</div><div class="num">72%</div><div class="small">准确率（+20pp）</div></div>
+    <div class="eyebrow">03 · PoC 验证（方法可行性）</div>
+    <h2>PoC 验证：方法可行</h2>
+    <p class="lead">以「付款支持文档」为例，工具自动生成的 BOM 在真实平台上优于传统手写方式。</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">
+      <div style="border:1px solid var(--line);border-radius:12px;padding:18px;background:var(--surface);text-align:center">
+        <div class="small" style="margin-bottom:6px">旧平台 · 业务手写</div>
+        <div style="font-size:30px;font-weight:700;color:var(--muted)">65%</div>
+        <div class="small" style="margin-top:6px;color:var(--muted)">至少 10 版迭代，投入＞16 小时</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--muted)">→</div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:18px;background:var(--surface);text-align:center">
+        <div class="small" style="margin-bottom:6px">新平台 · 用手工旧规则</div>
+        <div style="font-size:30px;font-weight:700;color:var(--amber)">52%</div>
+        <div class="small" style="margin-top:6px;color:var(--muted)">（旧规则在新平台上无效）</div>
+      </div>
     </div>
-    <div class="note">验证条款：付款支持文档（采购合同域）。提升 +20 个百分点，且超过业务人员手写的 BOM。<b>说明：单条款 PoC，方法路径已验证，下一步在更多条款上推广验证。</b></div>
+    <div class="ev">
+      <div class="box before"><div class="lbl">新平台 · 工具自动生成 BOM</div><div class="num">72%</div><div class="small">PoC 一步生成（无迭代）</div></div>
+      <div class="arrow">→</div>
+      <div class="box after"><div class="lbl">对比结论</div><div class="num">+20pp</div><div class="small">优于业务手写 10 版迭代（65%）且一步到位</div></div>
+    </div>
+    <div class="note">对比信息：业务同事 zhangqinghua（工号 00963947）在旧平台对同一条款迭代超过 10 版提示词，投入 &gt;16 小时达到 65%；新平台使用其旧规则仅 52%。本工具一步生成 BOM 达 72%，远超二者。<b>核心假设验证通过，方法路径可复制。</b></div>
   </section>
 
   <!-- 5 怎么工作 -->
@@ -167,7 +181,7 @@
       <li><span class="step-num">Step 2</span><b>正式开发</b>：按技术设计文档落地（Streamlit + MySQL），支持批量、版本管理、质量看板。</li>
       <li><span class="step-num">Step 3</span><b>对话 Copilot（后置）</b>：核心跑顺后，加侧边对话助手，自然语言查错例/归因/优化。</li>
     </ul>
-    <div class="note">设计文档已就绪：业务设计 / 技术设计 / 对话 Agent 设计 / 功能拆解与可信度 / 交互原型。</div>
+    <div class="note"><b>当前已完成：PoC 验证（52→72）+ 全套设计文档</b>（业务 / 技术 / Agent / 功能拆解 / 原型）。本次为<b>方案评审</b>，通过后启动正式开发。</div>
   </section>
 
 </div>
