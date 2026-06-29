@@ -241,11 +241,17 @@ def render_readable(bom):
          "【业务定义】", (bom.get("semantic_definition") or "（无）").strip() + "\n",
          "【抽取规则】", "🛑 绝对拦截规则（命中即放弃，针对误抽）："]
     inter = (bom.get("extraction_rules") or {}).get("absolute_interception_rules") or []
-    L += [f"  {i}. {r.get('rule', '')}   —— {r.get('fixes', '')}" for i, r in enumerate(inter, 1)] if inter else ["  （无）"]
+    L += [f"  {i}. {r.get('rule', '')}" for i, r in enumerate(inter, 1)] if inter else ["  （无）"]
     L.append("✅ 核心匹配规则（提取条件，针对漏抽）：")
     core = (bom.get("extraction_rules") or {}).get("core_match_rules") or []
-    L += [f"  {i}. {r.get('rule', '')}   —— {r.get('fixes', '')}" for i, r in enumerate(core, 1)] if core else ["  （无）"]
+    L += [f"  {i}. {r.get('rule', '')}" for i, r in enumerate(core, 1)] if core else ["  （无）"]
     L.append("")
+    _rationale = []   # 修订理由单独收集，置底展示，不混进规则
+    for _lab, _rs in [("🛑拦截", inter), ("✅匹配", core)]:
+        for _i, _r in enumerate(_rs, 1):
+            _f = str(_r.get("fixes", "")).strip() if isinstance(_r, dict) else ""
+            if _f:
+                _rationale.append(f"  - [{_lab}{_i}] {_f}")
     rp = bom.get("recall_profile") or {}
     L += ["【召回画像】",
           f"- 正向关键词：{', '.join(rp.get('positive_keywords') or []) or '（无）'}",
@@ -275,6 +281,9 @@ def render_readable(bom):
             L += [f"  - {r}" for r in rf]
         else:
             L.append("✓ 无红旗")
+    if _rationale:
+        L.append("\n【规则修订理由】（人审说明，不录入平台；解释每条规则的修订依据）")
+        L += _rationale
     return "\n".join(L)
 
 
