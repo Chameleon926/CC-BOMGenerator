@@ -120,7 +120,7 @@ CC-BOMGenerator/
 
 - **语言**：Python 3.11+
 - **后端**：FastAPI
-- **前端**：Vue 3 + Vite
+- **前端**：Vue 3 + Vite（**不用 Streamlit**，已废弃）
 - **脱敏**：Presidio（本地 NER）+ 规则替换
 - **LLM 客户端**：OpenAI 兼容（可配 api_key + base_url + 模型）
 - **数据库**：MySQL（utf8mb4）+ JSON 列；**SQLAlchemy ORM + Alembic 迁移**
@@ -161,8 +161,13 @@ CC-BOMGenerator/
 ## ▶️ 运行
 
 ```bash
-# 开发阶段
-PYTHONPATH=. streamlit run src/cc_bom_generator/ui/app.py
+# 后端（FastAPI）
+cd backend
+PYTHONPATH=. uvicorn src.main:app --reload --port 8000
+
+# 前端（Vue3，后端接口验证通过后再开发）
+cd frontend
+npm run dev
 
 # PoC 验证（已冻结）
 python quick_poc/rule_pipeline.py quick_poc/data/sample_slice.yaml --mode optimize --print-prompt

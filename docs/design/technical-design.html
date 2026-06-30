@@ -71,7 +71,7 @@
   <span class="eyebrow">技术设计文档 · Technical Design</span>
   <h1 class="title">语义 BOM 规则编译器<br>技术设计规范</h1>
   <p class="subtitle">面向实现的完整设计：节点架构、契约 schema、MySQL 数据模型、数据流、各模块算法逻辑、技术栈与分期。开发照此落地，业务/评审照此对齐。</p>
-  <div class="meta"><span class="chip"><b>版本</b>V0.1</span><span class="chip"><b>日期</b>2026-06-28</span><span class="chip"><b>形态</b>Python · Streamlit · MySQL</span><span class="chip"><b>解耦</b>独立于抽取平台</span></div>
+  <div class="meta"><span class="chip"><b>版本</b>V0.1</span><span class="chip"><b>日期</b>2026-06-28</span><span class="chip"><b>形态</b>Python · Vue3 · FastAPI · MySQL</span><span class="chip"><b>解耦</b>独立于抽取平台</span></div>
 </header>
 
 <section id="overview">
@@ -272,7 +272,7 @@ OptGain:                         <span class="c"># 🟢 本工具算</span>
   <table>
     <tr><th>层</th><th>选型</th><th>理由</th></tr>
     <tr><td>语言</td><td>Python 3.11+</td><td>LLM/数据生态、团队熟悉</td></tr>
-    <tr><td>前端</td><td>Streamlit</td><td>数据/看板类，Python 一体，2 人 hold 得住</td></tr>
+    <tr><td>前端</td><td>Vue3 + FastAPI</td><td>前后端分离，Vue3 做界面，FastAPI 做接口</td></tr>
     <tr><td>ORM/迁移</td><td>SQLAlchemy + Alembic</td><td>schema 版本化、协作同步</td></tr>
     <tr><td>数据库</td><td>MySQL（utf8mb4，JSON 列）</td><td>本地、生产级、嵌套用 JSON</td></tr>
     <tr><td>契约</td><td>Pydantic v2</td><td>节点 I/O 强类型</td></tr>
@@ -293,7 +293,7 @@ OptGain:                         <span class="c"># 🟢 本工具算</span>
 │  ├─ contracts/              <span class="c"># 【先建】Pydantic 契约</span>
 │  ├─ nodes/                  <span class="c"># ingest/anonymize/generate/diagnose/optimize/verify/apply/evaluate</span>
 │  ├─ db/                     <span class="c"># SQLAlchemy 模型 + Alembic</span>
-│  ├─ ui/                     <span class="c"># Streamlit 工作台/大盘/设置</span>
+│  ├─ ui/                     <span class="c"># Vue3 前端（工作台/大盘/设置）</span>
 │  └─ llm/                    <span class="c"># OpenAI 兼容客户端 + 重试</span>
 ├─ data/samples/              <span class="c"># 脱敏样例</span>
 └─ tests/                     <span class="c"># 每节点单测</span></div>
