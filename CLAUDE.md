@@ -179,8 +179,53 @@ python quick_poc/rule_pipeline.py quick_poc/data/sample_slice.yaml --mode optimi
 
 | 文档 | 路径 | 说明 |
 |---|---|---|
+| **生成场景后端专项** | `docs/技术设计-生成场景后端专项.md` | **当前主力文档**：A/B 模块分工 + 算法建议 + 文件映射表 |
 | 协作指南 | `docs/开发文档-协作指南.md` | 分支、IDE、DB、代码约定 |
 | 模块拆分 | `docs/功能模块拆分-按文件粒度.md` | M1-M9，每模块拆到文件/类/输入/输出 |
 | 领导汇报 | `docs/design/leadership-brief.html` | 8 页 HTML PPT |
 | 交互原型 | `docs/design/prototype-redesign.html` | Vue3 前端设计参考 |
 | 技术设计 | `docs/design/technical-design.html` | 架构/数据模型/分期 |
+| 进度跟踪 | `docs/progress.md` | 两人各自维护的开发进度 |
+
+---
+
+## 🚢 部署方案
+
+支持两种模式：
+
+### 本地开发（日常开发用）
+
+```bash
+# 后端
+cd backend
+python -m venv .venv
+pip install -r requirements.txt
+cp ../config/llm.example.yaml ../config/llm.yaml   # 填 api_key/model/数据库
+PYTHONPATH=. uvicorn src.main:app --reload --port 8000
+
+# 前端（后端接口验证通过后再开发）
+cd frontend
+npm install
+npm run dev    # → http://localhost:5173，自动代理 /api → backend:8000
+```
+
+**本地 MySQL**：localhost:3306，密码各自配置，直接用 Navicat 连。
+
+### Docker 一键部署（验证/演示/上线用）
+
+```bash
+docker-compose up -d
+# → MySQL(3306) + 后端(8000) + 前端(80) 全部起来
+# → 前端访问 http://localhost
+# → 后端 API http://localhost:8000/docs (FastAPI 自动文档)
+```
+
+**文件清单**：
+
+| 文件 | 说明 |
+|---|---|
+| `docker-compose.yml` | 三服务编排（MySQL + backend + frontend） |
+| `backend/Dockerfile` | python:3.11-slim + uvicorn |
+| `frontend/Dockerfile` | 多阶段构建（node:20 → nginx:alpine） |
+| `frontend/nginx.conf` | 静态托管 + `/api/` 反代到 backend:8000 |
+| `.dockerignore` | 排除 .git/docs/quick_poc/node_modules |
