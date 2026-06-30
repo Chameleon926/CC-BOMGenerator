@@ -22,12 +22,16 @@
 | 06-30 | B3 | nodes/profile_build.py | B1统计+大模型融合画像，9项断言通过 |
 | 06-30 | B4 | nodes/verify.py | 规则自检(温度0.0)，精准抓到漏抽风险 |
 | 06-30 | B5 | nodes/prompt_assemble.py | 提示词模板拼装，13项断言通过 |
+| 06-30 | 重构 | 12 files | Node/Skill流水线重构(BaseSkill+7个Skill+Orchestrator+回修) |
+| 06-30 | 重构 | test_orchestrator.py | 编排器测试4项全通过 |
+| 06-30 | DB | db/models.py | 6张表(Clause/BomVersion/PipelineRun/NodeExecution/LlmCall/RuleModification) |
+| 06-30 | DB | alembic | ru序列成功执行, 7张表已建到MySQL |
 
 ### 阻塞
 - 暂无
 
 ### 待对方
-- 等杨力写完 M5（llm/client.py）后集成到 M6 generate 的调用
+- 杨力写 llm/client.py 正式版（当前用临时版）
 
 ---
 
