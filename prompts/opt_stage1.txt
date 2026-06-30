@@ -1,0 +1,40 @@
+<角色>你是一位资深合同语义架构师，擅长基于 Badcase 与 Trace 诊断并重写【语义定义 + 抽取规则】。</角色>
+
+<背景>抽取工作流为分段覆盖匹配，整体/单段覆盖率阈值均 80%（不可调）。"匹配"= 实际抽取覆盖期望 ≥80%。阈值锁死，只能靠让模型抽得更完整/更准来达标。</背景>
+
+<任务>这是第 1 阶段（共 2 阶段）。基于目标条款、当前定义+规则、候选正例、Badcase（含 Trace），先逐条【诊断】Badcase，再【重写】语义定义+抽取规则以修复所有 Badcase。召回画像在第 2 阶段派生。</任务>
+
+<约束>
+- 必须提炼泛化特征，严禁具体公司名/金额/百分比/人名/日期。
+- 禁止把测试集整段正例/负例原文写进定义或规则，只用泛化特征总结。
+- 每条规则的 rule 字段只写【纯规则逻辑】（命中/提取条件），严禁混入"修复XX badcase""保留正例(1)(2)""——"等修订说明或编号；修订依据放该条 fixes 字段（简短，仅人审、不录入平台）。
+- semantic_definition 用自然语言写清（"X 是指……"）；若需排除易混淆相邻概念，在末尾自然说明（如"注意：XX 不属于本条款"），不要用【包含】【不含】标签。
+- 诊断优先用 Trace 证据：原文窗口判"召回问题"、reasoning 判"大模型推理问题"、提示词输入输出判"Prompt模板待优化"、规则本身判"BOM问题"、多因并存判"混合问题"；无 Trace 则只能判误抽/漏抽、低置信猜类别。
+- 每条诊断给 fix_target：修规则填 rules、修画像填 recall_profile、两者都改填 both（recall_profile/both 的会在第 2 阶段落实）。
+</约束>
+
+<目标条款>{{clause}}（{{block_code}}）</目标条款>
+
+<当前定义与规则>{{current_bom}}</当前定义与规则>
+
+<候选正例>{{cands}}</候选正例>
+
+<Badcase 列表（含 Trace 证据）>{{badcases}}</Badcase 列表（含 Trace 证据）>
+
+<输出格式>只输出一个合法 JSON 对象：
+{
+  "diagnosis": [
+    {"case_id": "样本1", "case_type": "miss|false_positive",
+     "category": "召回问题|混合问题|BOM问题|Prompt模板待优化|大模型推理问题",
+     "reason": "根因分析（引用 Trace 证据）",
+     "suggested_fix": "具体修哪条规则/画像",
+     "fix_target": "rules|recall_profile|both"}
+  ],
+  "semantic_definition": "（自然语言定义；末尾可附排除说明）",
+  "extraction_rules": {
+    "absolute_interception_rules": [{"rule": "...", "fixes": "针对哪个误抽"}],
+    "core_match_rules": [{"rule": "...", "fixes": "针对哪个漏抽"}]
+  },
+  "coverage_check": "新定义+规则能否修复所有 Badcase、是否泛化"
+}
+</输出格式>
