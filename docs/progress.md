@@ -8,8 +8,8 @@
 ## 🟦 林大宇（feature_lindayu）
 
 ### 当前任务
-- B 模块第 2 步 `generate.py` 已完成，实测通过。
-- 下一步：B 模块第 3 步 `profile_build.py`（组装召回画像）
+- B 模块第 3 步 `profile_build.py` 已完成，9项断言通过。
+- 下一步：B 模块第 4 步 `verify.py`（规则自检）
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
