@@ -153,7 +153,7 @@ CC-BOMGenerator/
 - [ ] nodes/ 节点实现（ingest → generate → diagnose → evaluate）
 - [ ] db/models + Alembic 迁移
 - [ ] llm/client 客户端
-- [ ] Streamlit UI（工作台/调优成效/设置）
+- [ ] Vue3 前端（工作台/调优成效/设置）
 - [ ] 集成联调 + 回归测试
 
 ---
@@ -182,5 +182,5 @@ python quick_poc/rule_pipeline.py quick_poc/data/sample_slice.yaml --mode optimi
 | 协作指南 | `docs/开发文档-协作指南.md` | 分支、IDE、DB、代码约定 |
 | 模块拆分 | `docs/功能模块拆分-按文件粒度.md` | M1-M9，每模块拆到文件/类/输入/输出 |
 | 领导汇报 | `docs/design/leadership-brief.html` | 8 页 HTML PPT |
-| 交互原型 | `docs/design/prototype-redesign.html` | Streamlit 界面设计参考 |
+| 交互原型 | `docs/design/prototype-redesign.html` | Vue3 前端设计参考 |
 | 技术设计 | `docs/design/technical-design.html` | 架构/数据模型/分期 |
