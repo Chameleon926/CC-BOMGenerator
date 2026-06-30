@@ -8,8 +8,8 @@
 ## 🟦 林大宇（feature_lindayu）
 
 ### 当前任务
-- B 模块第 1 步 `keyword_extract.py` 已完成，测试通过。
-- 下一步：B 模块第 2 步 `generate.py`（调大模型出定义+规则）
+- B 模块第 2 步 `generate.py` 已完成，实测通过。
+- 下一步：B 模块第 3 步 `profile_build.py`（组装召回画像）
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
@@ -17,6 +17,8 @@
 | 06-29 | M1 | contracts/ 全部 6 个文件 | 定义 BOM/TestSet/Diagnosis/Trace/Evaluation 契约 |
 | 06-30 | B1 | contracts/cleaned_test_set.py | 新增 CleanedTestSet + FullPrompt 契约 |
 | 06-30 | B1 | nodes/keyword_extract.py | jieba分词+词频+过滤+混淆词+聚类正例，4个测试全通过 |
+| 06-30 | LLM | llm/client.py | 双格式(OpenAI/Anthropic)，讯飞星辰API实测通过 |
+| 06-30 | B2 | nodes/generate.py | 调大模型出定义+规则，付款支持文档实测通过 |
 
 ### 阻塞
 - 暂无
