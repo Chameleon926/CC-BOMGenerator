@@ -25,12 +25,17 @@
    - 流程：个人分支 → 开 PR → 对方 review → 合入 `main`。
    - 合并前用 `/code-review` 自审，复杂改动用 `superpowers:requesting-code-review` 互审。
    - 小步提交，逻辑单元完成即 commit + push。
+   - **CC 行为拦截器**：每次被要求写代码或修改文件前，Claude Code 必须在底层隐式执行 `git branch`。如果检测到当前处于 `main` 分支，CC 必须**拒绝执行任何写操作**，并强制中断流程，提醒开发者切换到 `feature_lindayu` 等个人分支。绝对禁止在 `main` 分支产生任何 commit。
 
 4. **开工先 `git pull`，按模块分工**
    - **每次开始工作前，第一步必须是 `git pull origin main`**，拉取对方最新改动。
    - 避免两人同时改同一文件；按 `docs/技术设计-生成场景后端专项.md` 的文件映射表划分 ownership。
    - 拉取后若有冲突，优先保护契约文件与设计文档的权威性。
    - 开发进度同步：**每次开工先看 `docs/progress.md`**。
+   - **标准开工触发器**：当开发者在终端输入带有"开工"、"开始开发"、"今天继续"等意图的指令时，Claude Code 必须自动按顺序串行执行以下 3 步，无需等待确认：
+     ① 执行 `git pull origin main` 拉取最新代码；
+     ② 读取并总结 `docs/progress.md`，报告对方的最新进度；
+     ③ 读取 `docs/技术设计-生成场景后端专项.md` 和 `contracts/`，对比是否有影响当前模块的变更。全部完成后，向开发者输出简报再开始写代码。
 
 5. **脱敏与数据合规**
    - 真实合同数据、含敏感信息的评测集**不入库**（见 `.gitignore` 的 `data/raw` 等）。
@@ -59,6 +64,7 @@
 9. **改契约 = 停止 + 通知**
    - 任何涉及 `src/cc_bom_generator/contracts/` 的改动，必须先停止代码工作，通知对方（发消息或开 PR），等对方确认后再继续。
    - 这条没有例外。**契约是协作边界，改契约不通知等于拆桥**。
+   - **Auto 模式熔断器**：即使 Claude Code 当前运行在 auto/acceptEdits 模式，一旦判定需要修改 `src/.../contracts/` 或 `backend/src/cc_bom_generator/contracts/` 目录下的契约文件，CC 必须**强行挂起（Suspend）当前自动流程**。向终端抛出高亮警告说明原因，并强制等待开发者输入明确授权（如"同意修改"）后才能继续。严禁静默修改契约。
 
 ---
 
