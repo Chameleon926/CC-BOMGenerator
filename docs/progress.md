@@ -8,15 +8,15 @@
 ## 🟦 林大宇（feature_lindayu）
 
 ### 当前任务
-- M1 contracts/ 已全部定义（bom.py / test_set.py / diagnosis.py / trace.py / evaluation.py / __init__.py），本地验证通过。
-- 下一步：M2 db/models.py（SQLAlchemy 模型 + Alembic 初始化）
+- B 模块第 1 步 `keyword_extract.py` 已完成，测试通过。
+- 下一步：B 模块第 2 步 `generate.py`（调大模型出定义+规则）
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
 |------|------|------|------|
 | 06-29 | M1 | contracts/ 全部 6 个文件 | 定义 BOM/TestSet/Diagnosis/Trace/Evaluation 契约 |
-| 06-29 | 文档 | CLAUDE.md | 增加 7-9 条开发纪律（读设计文档/进度跟踪/改契约通知） |
-| 06-29 | 文档 | docs/progress.md | 创建进度跟踪文件 |
+| 06-30 | B1 | contracts/cleaned_test_set.py | 新增 CleanedTestSet + FullPrompt 契约 |
+| 06-30 | B1 | nodes/keyword_extract.py | jieba分词+词频+过滤+混淆词+聚类正例，4个测试全通过 |
 
 ### 阻塞
 - 暂无
