@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..base import BaseSkill
-from ..keyword_extract import _select_diverse
+from ._keyword_logic import _select_diverse
 from ...contracts.generation_state import GenerationState
 
 

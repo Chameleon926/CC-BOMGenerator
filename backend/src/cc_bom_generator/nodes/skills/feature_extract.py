@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..base import BaseSkill
-from ..keyword_extract import extract_keywords, _filter_keywords, _extract_confusion
+from ._keyword_logic import extract_keywords, _filter_keywords, _extract_confusion
 from ...contracts.generation_state import GenerationState
 
 

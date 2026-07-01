@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..base import BaseSkill
-from ..generate import generate_definition_and_rules
+from ._generate_logic import generate_definition_and_rules
 from ...contracts.generation_state import GenerationState
 
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..base import BaseSkill
-from ..verify import verify_bom, has_blocking_issues
+from ._verify_logic import verify_bom, has_blocking_issues
 from ...contracts.generation_state import GenerationState
 
 

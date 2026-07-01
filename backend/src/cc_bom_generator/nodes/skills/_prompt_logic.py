@@ -12,8 +12,8 @@ B 模块第 5 步：完整提示词组装（不用大模型）
 
 from __future__ import annotations
 
-from ..contracts.bom import BOM, ExtractionRules, RecallProfile
-from ..contracts.cleaned_test_set import FullPrompt
+from ...contracts.bom import BOM, ExtractionRules, RecallProfile
+from ...contracts.cleaned_test_set import FullPrompt
 
 
 def assemble_prompt(bom: BOM) -> FullPrompt:

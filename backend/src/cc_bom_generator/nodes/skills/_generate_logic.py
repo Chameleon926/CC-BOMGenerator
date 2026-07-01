@@ -12,9 +12,9 @@ from __future__ import annotations
 import json
 from typing import List
 
-from ..contracts.bom import BOM, ExtractionRule, ExtractionRules, BomSource
-from ..contracts.cleaned_test_set import CleanedTestSet
-from ..llm.client import call_json, render_prompt
+from ...contracts.bom import BOM, ExtractionRule, ExtractionRules, BomSource
+from ...contracts.cleaned_test_set import CleanedTestSet
+from ...llm.client import call_json, render_prompt
 
 
 def generate_definition_and_rules(

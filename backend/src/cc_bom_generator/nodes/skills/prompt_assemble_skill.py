@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..base import BaseSkill
-from ..prompt_assemble import assemble_prompt
+from ._prompt_logic import assemble_prompt
 from ...contracts.generation_state import GenerationState
 
 

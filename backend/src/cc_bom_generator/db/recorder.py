@@ -1,12 +1,16 @@
 """
-管线执行写库模块。
+管线执行写库模块（v2）—— 对齐 models.py v2 字段名。
 
-负责把管线执行过程持久化到数据库：
-- PipelineRun：每次 generate_bom() 执行
-- NodeExecution：每个 Skill 执行
-- LlmCall：每次 call_json() 调用
-- BomVersion：最终 BOM 快照
-- RuleModification：规则修订原因
+变更：
+- PipelineRun.status → run_status
+- PipelineRun.sequence → seq
+- BomVersion.source → bom_source
+- BomVersion.status → bom_status
+- LlmCall.model → model_name
+- BomVersion 删 extraction_rules_json/recall_profile_json（v2 只有 full_bom_json）
+- RuleModification before_text/after_text → before_json/after_json
+- session.get() 替代弃用的 Query.get()
+- 加 retry_round 参数到 record_node_execution
 """
 
 from __future__ import annotations
@@ -34,10 +38,8 @@ def start_pipeline_run(
     mode: str,
     input_cleaned_json: dict,
 ) -> int:
-    """管线开始时调用，返回 pipeline_run_id。"""
     session = SessionLocal()
     try:
-        # 确保 clause 存在
         clause = session.query(Clause).filter_by(block_code=block_code).first()
         if not clause:
             clause = Clause(block_code=block_code, block_name=block_name)
@@ -47,9 +49,8 @@ def start_pipeline_run(
         run = PipelineRun(
             block_code=block_code,
             mode=mode,
-            status="running",
+            run_status="running",
             input_cleaned_json=input_cleaned_json,
-            started_at=datetime.now(),
         )
         session.add(run)
         session.commit()
@@ -70,23 +71,27 @@ def finish_pipeline_run(
     output_bom_json: Optional[dict] = None,
     output_prompt_text: str = "",
     error_message: Optional[str] = None,
+    retry_count: int = 0,
 ):
     """管线结束时调用。"""
     session = SessionLocal()
     try:
-        run = session.query(PipelineRun).get(run_id)
+        run = session.get(PipelineRun, run_id)
         if not run:
             log.error(f"pipeline_run {run_id} 不存在")
             return
 
-        run.status = status
+        run.run_status = status
         run.finished_at = datetime.now()
         if run.started_at:
             run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
-        run.output_bom_json = output_bom_json
-        run.output_prompt_text = output_prompt_text
+        if output_bom_json is not None:
+            run.output_bom_json = output_bom_json
+        if output_prompt_text:
+            run.output_prompt_text = output_prompt_text
         if error_message:
             run.error_message = error_message
+        run.retry_count = retry_count
 
         session.commit()
         log.info(f"pipeline_run 完成: id={run_id}, status={status}, duration={run.duration_ms}ms")
@@ -103,21 +108,22 @@ def finish_pipeline_run(
 def record_node_execution(
     pipeline_run_id: int,
     skill_name: str,
-    sequence: int,
+    seq: int,
     input_json: Optional[dict] = None,
     output_json: Optional[dict] = None,
     is_retry: bool = False,
+    retry_round: int = 0,
     success: bool = True,
     duration_ms: Optional[int] = None,
 ) -> int:
-    """记录一个 Skill 的执行。返回 node_execution_id。"""
     session = SessionLocal()
     try:
         node = NodeExecution(
             pipeline_run_id=pipeline_run_id,
             skill_name=skill_name,
-            sequence=sequence,
+            seq=seq,
             is_retry=is_retry,
+            retry_round=retry_round,
             input_json=input_json,
             output_json=output_json,
             success=success,
@@ -126,7 +132,7 @@ def record_node_execution(
         session.add(node)
         session.commit()
         node_id = node.id
-        log.info(f"node_execution: run={pipeline_run_id}, skill={skill_name}, seq={sequence}, success={success}, {duration_ms}ms")
+        log.info(f"node_execution: run={pipeline_run_id}, skill={skill_name}, seq={seq}, retry_round={retry_round}, success={success}, {duration_ms}ms")
         return node_id
     except Exception as e:
         session.rollback()
@@ -141,7 +147,7 @@ def record_node_execution(
 def record_llm_call(
     node_execution_id: Optional[int],
     api_format: str,
-    model: str,
+    model_name: str,
     temperature: float,
     system_prompt: Optional[str] = None,
     user_prompt: Optional[str] = None,
@@ -151,13 +157,12 @@ def record_llm_call(
     error_message: Optional[str] = None,
     duration_ms: Optional[int] = None,
 ) -> int:
-    """记录一次大模型调用。返回 llm_call_id。"""
     session = SessionLocal()
     try:
         call = LlmCall(
             node_execution_id=node_execution_id,
             api_format=api_format,
-            model=model,
+            model_name=model_name,
             temperature=temperature,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -170,7 +175,7 @@ def record_llm_call(
         session.add(call)
         session.commit()
         call_id = call.id
-        log.info(f"llm_call: id={call_id}, model={model}, temp={temperature}, success={success}, {duration_ms}ms")
+        log.info(f"llm_call: id={call_id}, model={model_name}, temp={temperature}, success={success}, {duration_ms}ms")
         return call_id
     except Exception as e:
         session.rollback()
@@ -185,26 +190,21 @@ def record_llm_call(
 def save_bom_version(
     block_code: str,
     version: int,
-    source: str,
+    bom_source: str,
     semantic_definition: str,
-    extraction_rules_json: dict,
-    recall_profile_json: dict,
     full_bom_json: dict,
     prompt_text: str,
     pipeline_run_id: Optional[int] = None,
     created_by: str = "",
     previous_bom_id: Optional[int] = None,
 ) -> int:
-    """保存 BOM 版本快照。返回 bom_version_id。"""
     session = SessionLocal()
     try:
         bom = BomVersion(
             block_code=block_code,
             version=version,
-            source=source,
+            bom_source=bom_source,
             semantic_definition=semantic_definition,
-            extraction_rules_json=extraction_rules_json,
-            recall_profile_json=recall_profile_json,
             full_bom_json=full_bom_json,
             prompt_text=prompt_text,
             pipeline_run_id=pipeline_run_id,
@@ -213,14 +213,13 @@ def save_bom_version(
         )
         session.add(bom)
 
-        # 更新 clause 的 current_version
         clause = session.query(Clause).filter_by(block_code=block_code).first()
         if clause:
             clause.current_version = version
 
         session.commit()
         bom_id = bom.id
-        log.info(f"bom_version 保存: id={bom_id}, block_code={block_code}, version={version}, source={source}")
+        log.info(f"bom_version 保存: id={bom_id}, block_code={block_code}, version={version}, source={bom_source}")
         return bom_id
     except Exception as e:
         session.rollback()
@@ -237,7 +236,6 @@ def save_rule_modifications(
     modifications: list[dict],
     operator: str = "",
 ):
-    """保存规则修订记录。"""
     session = SessionLocal()
     try:
         for mod in modifications:
@@ -245,8 +243,8 @@ def save_rule_modifications(
                 bom_version_id=bom_version_id,
                 modification_type=mod.get("type", ""),
                 reason=mod.get("reason", ""),
-                before_text=mod.get("before", ""),
-                after_text=mod.get("after", ""),
+                before_json=mod.get("before"),
+                after_json=mod.get("after"),
                 operator=operator,
             )
             session.add(record)

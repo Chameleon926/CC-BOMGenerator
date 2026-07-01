@@ -26,9 +26,9 @@ import json
 import re
 from typing import List
 
-from ..contracts.bom import BOM, RecallProfile
-from ..contracts.cleaned_test_set import CleanedTestSet
-from ..llm.client import call_json, render_prompt
+from ...contracts.bom import BOM, RecallProfile
+from ...contracts.cleaned_test_set import CleanedTestSet
+from ...llm.client import call_json, render_prompt
 
 
 def build_profile(

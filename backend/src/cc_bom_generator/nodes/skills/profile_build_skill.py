@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..base import BaseSkill
-from ..profile_build import build_profile
+from ._profile_logic import build_profile
 from ...contracts.generation_state import GenerationState
 
 
