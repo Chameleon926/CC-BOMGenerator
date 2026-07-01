@@ -136,8 +136,7 @@ nodes/base.py                         林大宇    ❌      BaseSkill 基类
 nodes/skills/                         林大宇    ❌      B模块 Skill + 内部 logic
 db/models.py                          林大宇    ❌      ORM 表定义
 db/repository.py                      林大宇    ❌      Repository 写库（run 级 UoW），改=PR+通知
-db/recorder.py                        林大宇    待删     阶段5 删除（功能已迁 repository.py）
-db/__init__.py                        林大宇    ❌      Engine + Session
+db/__init__.py                        林大宇    ❌      Engine + Session + session_scope/get_db
 llm/client.py                         林大宇    可优化   LLM 客户端（杨力可提PR加超时/重试）
 logging_config.py                      林大宇    ❌      日志配置
 app.py + api/                          林大宇    ❌      FastAPI 应用工厂 + 路由（create_app / routers）

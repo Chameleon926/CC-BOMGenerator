@@ -6,8 +6,8 @@ import os
 # 把 backend/ 加到 Python 路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.cc_bom_generator.contracts.cleaned_test_set import CleanedTestSet
-from src.cc_bom_generator.nodes.keyword_extract import extract_keywords
+from src.cc_bom_generator.schemas.cleaned_test_set import CleanedTestSet
+from src.cc_bom_generator.nodes.skills._keyword_logic import extract_keywords
 
 
 def test_basic_extraction():

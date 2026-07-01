@@ -5,9 +5,9 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.cc_bom_generator.contracts.cleaned_test_set import CleanedTestSet
-from src.cc_bom_generator.contracts.bom import BOM, ExtractionRules, ExtractionRule, BomSource
-from src.cc_bom_generator.nodes.profile_build import build_profile
+from src.cc_bom_generator.schemas.cleaned_test_set import CleanedTestSet
+from src.cc_bom_generator.schemas.bom import BOM, ExtractionRules, ExtractionRule, BomSource
+from src.cc_bom_generator.nodes.skills._profile_logic import build_profile
 
 
 def test_profile_build_basic():

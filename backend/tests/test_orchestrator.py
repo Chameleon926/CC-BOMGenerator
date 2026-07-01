@@ -3,11 +3,13 @@
 import sys
 import os
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def create_cleaned():
-    from src.cc_bom_generator.contracts.cleaned_test_set import CleanedTestSet
+    from src.cc_bom_generator.schemas.cleaned_test_set import CleanedTestSet
 
     return CleanedTestSet(
         clause="付款支持文档",
@@ -23,15 +25,19 @@ def create_cleaned():
     )
 
 
+@pytest.mark.skip(reason="需真 DB + LLM，本地/CI 默认跳过；手动跑请配 config/llm.yaml")
 def test_orchestrator_full_pipeline():
     """测试完整管线：从 CleanedTestSet 到 FullPrompt。"""
     from src.cc_bom_generator.nodes.orchestrator import create_default_orchestrator
-    from src.cc_bom_generator.contracts.generation_state import GenerationState
+    from src.cc_bom_generator.schemas.generation_state import GenerationState
+    from src.cc_bom_generator.db import session_scope, PipelineRepository
 
     state = GenerationState(cleaned=create_cleaned(), skip_verify=True)
 
     orchestrator = create_default_orchestrator()
-    state = orchestrator.run(state)
+    with session_scope() as session:
+        repo = PipelineRepository(session)
+        state = orchestrator.run(state, repo)
 
     # 断言
     assert state.bom is not None, "BOM 应已生成"
@@ -58,15 +64,19 @@ def test_orchestrator_full_pipeline():
     print("✓ test_orchestrator_full_pipeline passed")
 
 
+@pytest.mark.skip(reason="需真 DB + LLM，本地/CI 默认跳过；手动跑请配 config/llm.yaml")
 def test_orchestrator_retry():
     """验证回修机制：SelfCheck.Summary 不为空。"""
     from src.cc_bom_generator.nodes.orchestrator import create_default_orchestrator
-    from src.cc_bom_generator.contracts.generation_state import GenerationState
+    from src.cc_bom_generator.schemas.generation_state import GenerationState
+    from src.cc_bom_generator.db import session_scope, PipelineRepository
 
     state = GenerationState(cleaned=create_cleaned(), skip_verify=False)
 
     orchestrator = create_default_orchestrator()
-    state = orchestrator.run(state)
+    with session_scope() as session:
+        repo = PipelineRepository(session)
+        state = orchestrator.run(state, repo)
 
     # 断言
     assert state.bom is not None
@@ -86,9 +96,9 @@ def test_orchestrator_retry():
 def test_rule_check():
     """验证程序化规则校验。"""
     from src.cc_bom_generator.nodes.skills.rule_check import RuleCheckSkill, _extract_rule_keywords
-    from src.cc_bom_generator.contracts.bom import BOM, ExtractionRules, ExtractionRule, BomSource
-    from src.cc_bom_generator.contracts.cleaned_test_set import CleanedTestSet
-    from src.cc_bom_generator.contracts.generation_state import GenerationState
+    from src.cc_bom_generator.schemas.bom import BOM, ExtractionRules, ExtractionRule, BomSource
+    from src.cc_bom_generator.schemas.cleaned_test_set import CleanedTestSet
+    from src.cc_bom_generator.schemas.generation_state import GenerationState
 
     # 构造一个有误杀风险的 BOM
     bom = BOM(
@@ -128,7 +138,7 @@ def test_rule_check():
 def test_extract_rule_keywords():
     """验证 _extract_rule_keywords 能提取引号内关键词。"""
     from src.cc_bom_generator.nodes.skills.rule_check import _extract_rule_keywords
-    from src.cc_bom_generator.contracts.bom import ExtractionRule
+    from src.cc_bom_generator.schemas.bom import ExtractionRule
 
     rules = [
         ExtractionRule(rule="出现'付款'或'发票'关键词→拦截"),

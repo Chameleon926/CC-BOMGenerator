@@ -5,10 +5,10 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.cc_bom_generator.contracts.bom import (
+from src.cc_bom_generator.schemas.bom import (
     BOM, ExtractionRules, ExtractionRule, RecallProfile, BomSource,
 )
-from src.cc_bom_generator.nodes.verify import verify_bom, has_blocking_issues
+from src.cc_bom_generator.nodes.skills._verify_logic import verify_bom, has_blocking_issues
 
 
 def test_verify_basic():
@@ -92,7 +92,7 @@ def test_verify_basic():
 
 def test_has_blocking_issues():
     """测试 has_blocking_issues 函数。"""
-    from src.cc_bom_generator.contracts.diagnosis import Verification
+    from src.cc_bom_generator.schemas.diagnosis import Verification
 
     # 无红旗、无 fail
     v1 = Verification(checks=[{"verdict": "pass"}], red_flags=[])

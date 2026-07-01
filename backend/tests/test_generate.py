@@ -8,9 +8,9 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.cc_bom_generator.contracts.cleaned_test_set import CleanedTestSet
-from src.cc_bom_generator.contracts.bom import BomSource
-from src.cc_bom_generator.nodes.generate import generate_definition_and_rules
+from src.cc_bom_generator.schemas.cleaned_test_set import CleanedTestSet
+from src.cc_bom_generator.schemas.bom import BomSource
+from src.cc_bom_generator.nodes.skills._generate_logic import generate_definition_and_rules
 
 
 def test_generate_basic():

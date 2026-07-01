@@ -5,10 +5,10 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.cc_bom_generator.contracts.bom import (
+from src.cc_bom_generator.schemas.bom import (
     BOM, ExtractionRules, ExtractionRule, RecallProfile, BomSource,
 )
-from src.cc_bom_generator.nodes.prompt_assemble import assemble_prompt
+from src.cc_bom_generator.nodes.skills._prompt_logic import assemble_prompt
 
 
 def test_assemble_basic():
