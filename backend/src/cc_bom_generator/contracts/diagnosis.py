@@ -2,23 +2,19 @@
 
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List
+
+from ..enums import DiagnosisCategory, ConfidenceLevel, FixTarget, CaseType
 
 
 class DiagnosisResult(BaseModel):
     case_id: str = Field(..., description="badcase 标识")
-    case_type: Literal["miss", "false_positive"] = Field(..., description="漏抽/误抽")
-    category: Literal["召回问题", "混合问题", "BOM问题", "Prompt模板待优化", "大模型推理问题"] = Field(
-        ..., description="5 类归因"
-    )
+    case_type: CaseType = Field(..., description="漏抽/误抽")
+    category: DiagnosisCategory = Field(..., description="5 类归因")
     reason: str = Field("", description="根因分析（文字）")
     suggested_fix: str = Field("", description="建议修法")
-    fix_target: Literal["rules", "recall_profile", "both"] = Field(
-        "rules", description="修复落点: rules→改规则, recall_profile→改画像, both→两者都改"
-    )
-    confidence: Literal["高", "中", "低"] = Field(
-        "中", description="归因置信度（无 trace 时为低）"
-    )
+    fix_target: FixTarget = Field(FixTarget.RULES, description="修复落点: rules→改规则, recall_profile→改画像, both→两者都改")
+    confidence: ConfidenceLevel = Field(ConfidenceLevel.MEDIUM, description="归因置信度（无 trace 时为低）")
     trace_available: bool = Field(False, description="是否有 trace 证据")
 
 

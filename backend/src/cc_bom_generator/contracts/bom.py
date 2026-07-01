@@ -4,19 +4,8 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
-from enum import Enum
 
-
-class BomSource(str, Enum):
-    GENERATE = "generate"   # 基于正例初始生成
-    OPTIMIZE = "optimize"   # 基于 badcase + trace 优化
-    MANUAL = "manual"       # 业务手动写入
-
-
-class BOMStatus(str, Enum):
-    DRAFT = "draft"          # AI 草稿，未审
-    REVIEWED = "reviewed"    # 业务已确认
-    DEACTIVATED = "deactivated"  # 被新版本取代
+from ..enums import BomSource, BOMStatus
 
 
 class ExtractionRule(BaseModel):

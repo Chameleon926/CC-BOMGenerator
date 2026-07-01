@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List, Optional
+
+from ..enums import CaseType
 
 
 class Item(BaseModel):
@@ -33,7 +35,7 @@ class Badcase(BaseModel):
     case_id: str = Field("", description="badcase 标识, 如 'DOC123_1'")
     doc_id: str = Field("", description="所属文档 ID")
     block_code: str = Field("", description="语义块编码")
-    case_type: Literal["miss", "false_positive"] = Field("miss", description="漏抽/误抽")
+    case_type: CaseType = Field(CaseType.MISS, description="漏抽/误抽")
     expected: str = Field("", description="期望值")
     actual: str = Field("", description="实际抽取值")
     similarity: Optional[float] = Field(None, description="覆盖率/相似度（平台返回）")
