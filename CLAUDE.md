@@ -94,11 +94,57 @@ ingest(数据加载) → anonymize(脱敏) → generate(BOM生成) → diagnose(
 CC-BOMGenerator/
 ├─ backend/                    # Python 后端（FastAPI）
 │  ├─ src/cc_bom_generator/
-│  │  ├─ contracts/            # Pydantic 契约（已定义 6 个文件）
-│  │  ├─ nodes/                # ingest/anonymize/generate/diagnose/evaluate
-│  │  ├─ db/                   # SQLAlchemy + Alembic
-│  │  └─ llm/                  # LLM 客户端
+│  │  ├─ enums/                # ✅ 枚举唯一事实源（BomSource/BOMStatus/DiagnosisCategory 等 8 个）
+│  │  ├─ contracts/            # Pydantic 契约（8 个文件，引用 enums 不内联枚举）
+│  │  ├─ nodes/                # 编排层
+│  │  │  ├─ base.py            # BaseSkill 基类
+│  │  │  ├─ orchestrator.py     # 管线编排器（含回修+写库）
+│  │  │  ├─ pipeline.py        # 入口（调 orchestrator）
+│  │  │  └─ skills/            # 唯一实现：7 个 Skill + 5 个内部 logic（_*_logic.py）
+│  │  ├─ db/                   # SQLAlchemy ORM（12 张表）+ recorder + Alembic
+│  │  ├─ llm/                  # LLM 客户端（双格式 OpenAI/Anthropic）
+│  │  ├─ logging_config.py     # 统一日志（log.info/log.error）
+│  │  └─ main.py               # FastAPI 入口（待拆为 api/routers/）
 │  ├─ requirements.txt
+│  ├─ alembic/                 # 迁移脚本（0001 初始 + 0002 v2 schema）
+│  └─ tests/                  # 单元测试
+├─ frontend/                   # Vue 前端
+├─ config/
+│  └─ llm.yaml                 # 模型配置（gitignore，各自填）
+├─ prompts/                    # 提示词（纯文本 + {{var}}，与代码分离）
+├─ quick_poc/                  # PoC 验证代码（已冻结）
+├─ docs/
+│  ├─ 技术设计-生成场景后端专项.md  # 主力技术文档（含第9章数据库设计）
+│  └─ progress.md              # 开发进度跟踪
+├─ CLAUDE.md
+├─ .gitignore
+└─ README.md
+```
+
+### 文件协作矩阵（谁写什么，不要碰对方的文件）
+
+```
+文件/目录                              林大宇    杨力    说明
+enums/                                林大宇    ❌      枚举唯一事实源，改=PR+通知
+contracts/                            林大宇    ❌      Pydantic 契约，改=PR+通知
+nodes/orchestrator.py                 林大宇    ❌      编排器
+nodes/pipeline.py                     林大宇    ❌      管线入口
+nodes/base.py                         林大宇    ❌      BaseSkill 基类
+nodes/skills/                         林大宇    ❌      B模块 Skill + 内部 logic
+db/models.py                          林大宇    ❌      ORM 表定义
+db/recorder.py                        林大宇    可优化   写库逻辑（杨力可提PR优化session管理）
+db/__init__.py                        林大宇    ❌      Engine + Session
+llm/client.py                         林大宇    可优化   LLM 客户端（杨力可提PR加超时/重试）
+logging_config.py                      林大宇    ❌      日志配置
+main.py                               林大宇    ❌      API 入口（Step 2 后拆为 api/routers/）
+services/ingest_service.py             ❌        杨力    A模块：Excel解析→CleanedTestSet（Step 2后创建）
+alembic/                              林大宇    ❌      迁移脚本
+prompts/*.txt                          两人都改  互相通知
+config/llm.yaml                       各自填    各自填  不入库、互不影响
+tests/test_*.py                        各自写    各自写  谁的模块谁写测试
+```
+
+> **规矩：不要碰对方目录的文件。需要改对方的文件=开 PR + 通知。**
 │  └─ alembic/
 ├─ frontend/                   # Vue 前端
 │  ├─ src/
