@@ -1,16 +1,23 @@
 """
-生成场景编排器 —— 按序执行 Skill，管理回修循环，写库记录。
+生成场景编排器 —— 按序执行 Skill，管理回修循环，通过 Repository 写库。
+
+事务边界：run(state, repo) 接收外部注入的 PipelineRepository（共享 session）。
+orchestrator 只通过 repo 写库（repo 方法只 flush 不 commit），事务由调用层控制：
+  · HTTP 入口：services.generate_service 管 commit / rollback
+  · 非 HTTP 入口：nodes.pipeline.generate_bom 用 db.session_scope() 管 commit
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from ..logging_config import get_logger
 from ..schemas.generation_state import GenerationState
-from ..db import recorder
 from .base import BaseSkill
+
+if TYPE_CHECKING:
+    from ..db.repository import PipelineRepository
 
 log = get_logger("orchestrator")
 
@@ -28,13 +35,13 @@ class GenerationOrchestrator:
         self.max_retries = max_retries
         self.retry_skills = retry_skills or self._default_retry_skills()
 
-    def run(self, state: GenerationState) -> GenerationState:
-        """执行完整管线，自动记录到数据库。"""
+    def run(self, state: GenerationState, repo: "PipelineRepository") -> GenerationState:
+        """执行完整管线，通过 repo 记录到数据库（事务由调用层控制）。"""
         cleaned = state.cleaned
         log.info(f"管线启动: 条款={cleaned.clause} ({cleaned.block_code}), 正例数={len(cleaned.positive_values)}")
 
         # ---- 写库：创建 pipeline_run ----
-        run_id = recorder.start_pipeline_run(
+        run_id = repo.start_pipeline_run(
             block_code=cleaned.block_code,
             block_name=cleaned.clause,
             mode="generate",
@@ -48,18 +55,18 @@ class GenerationOrchestrator:
             seq = 0
             for skill in self.skills:
                 seq += 1
-                state = self._execute_skill(skill, state, seq, run_id, is_retry=False)
+                state = self._execute_skill(skill, state, seq, run_id, repo, is_retry=False)
 
-                # 每次生成/修改 BOM 后更新 pipeline_run 的 output 快照
+                # 每次生成/修改 BOM 后更新 pipeline_run 的 output 快照（仅 flush，不破坏外层事务）
                 if state.bom:
-                    recorder.finish_pipeline_run(
+                    repo.finish_pipeline_run(
                         run_id, status="running",
                         output_bom_json=state.bom.model_dump(mode="json"),
                     )
 
             # ---- 回修检查 ----
             if self._needs_retry(state):
-                state = self._do_retry(state, run_id)
+                state = self._do_retry(state, run_id, repo)
 
         except Exception as e:
             error_msg = str(e)
@@ -70,7 +77,7 @@ class GenerationOrchestrator:
             final_status = "fail" if error_msg else "success"
             final_bom = state.bom.model_dump(mode="json") if state.bom else None
             final_prompt = state.full_prompt.prompt_text if state.full_prompt else ""
-            recorder.finish_pipeline_run(
+            repo.finish_pipeline_run(
                 run_id,
                 status=final_status,
                 output_bom_json=final_bom,
@@ -80,13 +87,11 @@ class GenerationOrchestrator:
 
         # ---- 写库：保存 BOM 版本 ----
         if state.bom and state.full_prompt:
-            bom_id = recorder.save_bom_version(
+            bom_id = repo.save_bom_version(
                 block_code=state.bom.block_code,
                 version=state.bom.version,
-                source=state.bom.source.value,
+                bom_source=state.bom.source.value,
                 semantic_definition=state.bom.semantic_definition,
-                extraction_rules_json=state.bom.extraction_rules.model_dump(mode="json"),
-                recall_profile_json=state.bom.recall_profile.model_dump(mode="json"),
                 full_bom_json=state.bom.model_dump(mode="json"),
                 prompt_text=state.full_prompt.prompt_text,
                 pipeline_run_id=run_id,
@@ -102,6 +107,7 @@ class GenerationOrchestrator:
         state: GenerationState,
         sequence: int,
         run_id: int,
+        repo: "PipelineRepository",
         is_retry: bool,
     ) -> GenerationState:
         """执行单个 Skill，记录耗时和输出到数据库。"""
@@ -126,13 +132,14 @@ class GenerationOrchestrator:
                 output_snapshot = output_snapshot or {}
                 output_snapshot["verification_summary"] = state.verification.summary
 
-            recorder.record_node_execution(
+            repo.record_node_execution(
                 pipeline_run_id=run_id,
                 skill_name=skill.name,
-                sequence=sequence,
+                seq=sequence,
                 input_json=None,
                 output_json=output_snapshot,
                 is_retry=is_retry,
+                retry_round=state.retry_count if is_retry else 0,
                 success=success,
                 duration_ms=duration_ms,
             )
@@ -152,7 +159,7 @@ class GenerationOrchestrator:
             return True
         return False
 
-    def _do_retry(self, state: GenerationState, run_id: int) -> GenerationState:
+    def _do_retry(self, state: GenerationState, run_id: int, repo: "PipelineRepository") -> GenerationState:
         state.retry_count += 1
         retry_context = self._collect_retry_feedback(state)
         log.info(f"触发回修（第 {state.retry_count} 次）: {retry_context}")
@@ -160,7 +167,7 @@ class GenerationOrchestrator:
         for skill in self.retry_skills:
             if hasattr(skill, 'current_bom'):
                 skill.current_bom = self._build_retry_bom_text(state)
-            state = self._execute_skill(skill, state, sequence=100 + state.retry_count, run_id=run_id, is_retry=True)
+            state = self._execute_skill(skill, state, sequence=100 + state.retry_count, run_id=run_id, repo=repo, is_retry=True)
 
         if self._needs_retry(state) and state.retry_count < self.max_retries:
             log.info(f"回修后仍有问题，但已达回修上限，输出当前版本")

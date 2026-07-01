@@ -1,13 +1,15 @@
 """
-生成场景编排入口。
+生成场景编排入口（非 HTTP 同步入口）。
 
-保持 generate_bom() 入口不变（向后兼容），内部改为调 Orchestrator。
+保持 generate_bom() 入口签名不变（向后兼容），内部改为：
+Orchestrator + Repository + session_scope（run 级 Unit-of-Work 事务）。
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
+from ..db import session_scope, PipelineRepository
 from ..schemas.bom import BOM
 from ..schemas.cleaned_test_set import CleanedTestSet, FullPrompt
 from ..schemas.diagnosis import Verification
@@ -25,7 +27,8 @@ def generate_bom(
     """
     生成场景完整编排：CleanedTestSet → BOM + FullPrompt + Verification
 
-    内部使用 Orchestrator + Skill 流水线架构。
+    内部使用 Orchestrator + Skill 流水线 + Repository 写库。
+    一次调用包在 session_scope 里 = 一个事务（run 级 UoW，全成或全回滚）。
     对外接口保持不变，向后兼容。
     """
     # 初始化状态
@@ -37,11 +40,13 @@ def generate_bom(
         skip_verify=skip_verify,
     )
 
-    # 创建并运行编排器
+    # 创建编排器，在 session_scope 事务内执行（出块统一 commit / 异常 rollback）
     orchestrator = create_default_orchestrator()
-    state = orchestrator.run(state)
+    with session_scope() as session:
+        repo = PipelineRepository(session)
+        state = orchestrator.run(state, repo)
 
-    # 提取结果
+    # session 已 commit+close；bom/full_prompt/verification 是 pydantic 对象，可安全读取
     bom = state.bom
     full_prompt = state.full_prompt
     verification = state.verification
