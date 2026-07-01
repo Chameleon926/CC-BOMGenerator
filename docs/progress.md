@@ -12,7 +12,7 @@
   - ✅ 阶段1：contracts/ → schemas/ 物理搬移 + import 替换
   - ✅ 阶段2：recorder.py → PipelineRepository 类（注入 session，run 级 UoW 事务）
   - ✅ 阶段3：orchestrator 解耦 + 修签名 bug（source→bom_source、删多余 json、sequence→seq）
-  - ⏳ 阶段4：main.py → app/api/routers + services 分层
+  - ✅ 阶段4：main.py → app/api/routers + services 分层
   - ⏳ 阶段5：修 5 个坏测试 + 删 recorder
 - 再下一步：Step 3 Agent 化（BaseSkill 加 reads/writes、orchestrator 解耦 DB）
 
@@ -36,6 +36,7 @@
 | 07-01 | Step2-阶段1 | schemas/（原contracts/） | git mv 整目录→schemas/ + nodes下13文件import替换；CLAUDE.md目录树/矩阵+技术文档3.1-3.2路径同步 |
 | 07-01 | Step2-阶段2 | db/repository.py + db/__init__.py | 新增 PipelineRepository（6方法，注入session，只flush不commit）；db/__init__ 加 session_scope/get_db；recorder 暂留待阶段5删 |
 | 07-01 | Step2-阶段3 | nodes/orchestrator.py + nodes/pipeline.py | 删 recorder 依赖、run(state,repo) 注入；修签名 bug（source→bom_source、删多余 json、sequence→seq）；pipeline 用 session_scope 包事务；技术文档新增第10章分层架构 |
+| 07-01 | Step2-阶段4 | app.py + api/ + services/ + main.py薄壳 | main.py 拆为 create_app 工厂 + api/routers/generate.py + services/(generate\|ingest)_service.py；main.py 改启动薄壳；装 fastapi/uvicorn；路由冒烟 + HTTP /api/health 200 通过 |
 
 ### 阻塞
 - 暂无
