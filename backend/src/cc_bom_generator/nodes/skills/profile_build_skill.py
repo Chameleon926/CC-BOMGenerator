@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..base import BaseSkill
 from ._profile_logic import build_profile
-from ...contracts.generation_state import GenerationState
+from ...schemas.generation_state import GenerationState
 
 
 class ProfileBuildSkill(BaseSkill):

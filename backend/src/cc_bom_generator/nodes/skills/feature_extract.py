@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..base import BaseSkill
 from ._keyword_logic import extract_keywords, _filter_keywords, _extract_confusion
-from ...contracts.generation_state import GenerationState
+from ...schemas.generation_state import GenerationState
 
 
 class FeatureExtractSkill(BaseSkill):

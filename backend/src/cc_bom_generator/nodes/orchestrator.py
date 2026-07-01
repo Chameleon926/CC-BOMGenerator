@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from ..logging_config import get_logger
-from ..contracts.generation_state import GenerationState
+from ..schemas.generation_state import GenerationState
 from ..db import recorder
 from .base import BaseSkill
 

@@ -8,8 +8,12 @@
 ## 🟦 林大宇（feature_lindayu）
 
 ### 当前任务
-- Step 1 完成（修 recorder + 删旧 nodes + 抽 enums）。
-- 下一步：**Step 2 分层重构**（contracts→schemas、recorder→Repository 类、main.py→api/routers + services）
+- **Step 2 分层重构进行中**（5 阶段，每阶段 1 commit；计划见 ~/.claude/plans/shimmying-moseying-hopcroft.md）：
+  - ✅ 阶段1：contracts/ → schemas/ 物理搬移 + import 替换
+  - ⏳ 阶段2：recorder.py → PipelineRepository 类（注入 session，run 级 UoW 事务）
+  - ⏳ 阶段3：orchestrator 解耦 + 修签名 bug（source→bom_source、删多余 json、sequence→seq）
+  - ⏳ 阶段4：main.py → app/api/routers + services 分层
+  - ⏳ 阶段5：修 5 个坏测试 + 删 recorder
 - 再下一步：Step 3 Agent 化（BaseSkill 加 reads/writes、orchestrator 解耦 DB）
 
 ### 已完成
@@ -29,6 +33,7 @@
 | 07-01 | Step1 | recorder.py v2 | 字段对齐models v2（run_status/bom_source/model_name/seq/before_json） |
 | 07-01 | Step1 | nodes/ 清理 | 删5个旧函数式文件，逻辑移入 skills/_*_logic.py |
 | 07-01 | Step1 | enums/ | 新增8个枚举统一事实源，contracts里的Literal全部替换 |
+| 07-01 | Step2-阶段1 | schemas/（原contracts/） | git mv 整目录→schemas/ + nodes下13文件import替换；CLAUDE.md目录树/矩阵+技术文档3.1-3.2路径同步 |
 
 ### 阻塞
 - 暂无

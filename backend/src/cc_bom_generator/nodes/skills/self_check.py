@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..base import BaseSkill
 from ._verify_logic import verify_bom, has_blocking_issues
-from ...contracts.generation_state import GenerationState
+from ...schemas.generation_state import GenerationState
 
 
 class SelfCheckSkill(BaseSkill):

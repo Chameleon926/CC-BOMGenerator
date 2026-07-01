@@ -21,8 +21,8 @@ from __future__ import annotations
 import json
 from typing import List
 
-from ...contracts.bom import BOM
-from ...contracts.diagnosis import Verification
+from ...schemas.bom import BOM
+from ...schemas.diagnosis import Verification
 from ...llm.client import call_json, render_prompt
 
 

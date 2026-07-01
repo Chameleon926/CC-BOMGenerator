@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..contracts.bom import BOM
-from ..contracts.cleaned_test_set import CleanedTestSet, FullPrompt
-from ..contracts.diagnosis import Verification
-from ..contracts.generation_state import GenerationState
+from ..schemas.bom import BOM
+from ..schemas.cleaned_test_set import CleanedTestSet, FullPrompt
+from ..schemas.diagnosis import Verification
+from ..schemas.generation_state import GenerationState
 from .orchestrator import create_default_orchestrator
 
 

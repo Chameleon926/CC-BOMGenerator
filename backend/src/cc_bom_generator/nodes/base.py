@@ -3,7 +3,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 
-from ..contracts.generation_state import GenerationState
+from ..schemas.generation_state import GenerationState
 
 
 class BaseSkill(ABC):

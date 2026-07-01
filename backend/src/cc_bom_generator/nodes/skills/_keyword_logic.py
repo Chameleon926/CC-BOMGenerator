@@ -18,7 +18,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from ...contracts.cleaned_test_set import CleanedTestSet
+from ...schemas.cleaned_test_set import CleanedTestSet
 
 
 # ==================== 停用词 ====================

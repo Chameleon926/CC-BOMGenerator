@@ -11,7 +11,7 @@ import re
 from typing import List
 
 from ..base import BaseSkill
-from ...contracts.generation_state import GenerationState
+from ...schemas.generation_state import GenerationState
 
 
 class RuleCheckSkill(BaseSkill):
