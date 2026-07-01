@@ -14,7 +14,7 @@
   - ✅ 阶段3：orchestrator 解耦 + 修签名 bug（source→bom_source、删多余 json、sequence→seq）
   - ✅ 阶段4：main.py → app/api/routers + services 分层
   - ✅ 阶段5：修 5 个坏测试 + 删 recorder
-- **调优闭环设计已完成**（brainstorm + spec）：详见 `docs/superpowers/specs/2026-07-01-tuning-loop-design.md`（4 节点独立 service / BOMDelta 契约 / TuningRepository / 乐观锁 / root_component 归因路由 / 务实档）。下一步：写实现计划（writing-plans）→ 分阶段实现
+- **调优闭环设计+实现计划已完成**：spec（`docs/superpowers/specs/2026-07-01-tuning-loop-design.md`）+ 计划（`docs/superpowers/plans/2026-07-01-tuning-loop.md`，三批 PR × 13 task TDD）。下一步：执行计划（PR1 契约+DB → 待杨力 review → PR2 logic+prompt → PR3 service/API）
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
@@ -39,6 +39,7 @@
 | 07-01 | Step2-阶段4 | app.py + api/ + services/ + main.py薄壳 | main.py 拆为 create_app 工厂 + api/routers/generate.py + services/(generate\|ingest)_service.py；main.py 改启动薄壳；装 fastapi/uvicorn；路由冒烟 + HTTP /api/health 200 通过 |
 | 07-01 | Step2-阶段5 | tests/（5 logic + orchestrator）+ 删 recorder | 5 坏测试 import 对齐 skills/_*_logic + schemas；test_orchestrator full/retry 改 run(state,repo)+标 skip；删 db/recorder.py；pytest collect 13 项全绿，6 项纯逻辑测试 PASSED |
 | 07-01 | 调优闭环设计 | docs/superpowers/specs/2026-07-01-tuning-loop-design.md | brainstorm 5 段：4 节点独立 service(走法A) + BOMDelta 契约 + TuningRepository + alembic 0003(trace_json+pending_deltas) + 乐观锁 + root_component 归因路由 + 务实档；自审已修 4 处 |
+| 07-01 | 调优闭环计划 | docs/superpowers/plans/2026-07-01-tuning-loop.md | writing-plans：三批 PR × 13 task（契约+DB / logic+prompt / service+API），每 task TDD（写测试→实现→commit），含完整代码骨架+测试 |
 
 ### 阻塞
 - 暂无
