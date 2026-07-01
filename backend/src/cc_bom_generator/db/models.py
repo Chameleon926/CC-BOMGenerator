@@ -230,6 +230,7 @@ class Badcase(Base):
     overall_coverage = Column(Float, comment="整体覆盖率")
     segment_coverage = Column(Float, comment="单段覆盖率")
     reason = Column(String(256))
+    trace_json = Column(JSON, nullable=True, comment="解析后的 StructuredTrace（无 trace 则 NULL）")
     created_at = Column(DateTime, server_default=func.now())
 
 
@@ -259,4 +260,18 @@ class DesensitizationLog(Base):
     doc_ids = Column(Text, comment="涉及文档ID（逗号分隔）")
     rule_version = Column(String(32), comment="脱敏规则版本")
     mapping_snapshot = Column(JSON, comment="脱敏映射表快照")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class PendingDelta(Base):
+    """待审 BOMDelta 队列（optimize 产出，apply 确认后转正式 bom_version）。"""
+    __tablename__ = "pending_deltas"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False, index=True)
+    from_bom_version_id = Column(Integer, ForeignKey("bom_versions.id", ondelete="RESTRICT"), nullable=False, comment="乐观锁基线版本")
+    delta_json = Column(JSON, nullable=False, comment="BOMDelta 完整 JSON")
+    status = Column(String(16), server_default="pending", comment="pending/approved/rejected")
+    reviewed_by = Column(String(32), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
