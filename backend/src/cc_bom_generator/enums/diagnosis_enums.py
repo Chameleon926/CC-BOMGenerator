@@ -30,3 +30,15 @@ class CaseType(str, Enum):
     """Badcase 类型。"""
     MISS = "miss"
     FALSE_POSITIVE = "false_positive"
+
+
+class RootComponent(str, Enum):
+    """归因路由：问题在抽取层还是 DQ 校验层。"""
+    EXTRACTION = "extraction"   # 抽取规则/模型/画像 → 进 optimize
+    DQ = "dq"                   # 新平台 DQ 漏拦 → 交新平台团队，不进 optimize
+
+
+class Severity(str, Enum):
+    """错例严重性。fatal = 方向/主体/金额反转（业务致命）。"""
+    NORMAL = "normal"
+    FATAL = "fatal"

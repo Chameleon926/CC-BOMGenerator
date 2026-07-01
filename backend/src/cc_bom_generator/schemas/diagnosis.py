@@ -4,7 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import List
 
-from ..enums import DiagnosisCategory, ConfidenceLevel, FixTarget, CaseType
+from ..enums import DiagnosisCategory, ConfidenceLevel, FixTarget, CaseType, RootComponent, Severity
 
 
 class DiagnosisResult(BaseModel):
@@ -16,6 +16,8 @@ class DiagnosisResult(BaseModel):
     fix_target: FixTarget = Field(FixTarget.RULES, description="修复落点: rules→改规则, recall_profile→改画像, both→两者都改")
     confidence: ConfidenceLevel = Field(ConfidenceLevel.MEDIUM, description="归因置信度（无 trace 时为低）")
     trace_available: bool = Field(False, description="是否有 trace 证据")
+    root_component: RootComponent = Field(RootComponent.EXTRACTION, description="归因路由：extraction→进 optimize；dq→交新平台")
+    severity: Severity = Field(Severity.NORMAL, description="normal/fatal（方向·主体·金额反转=fatal）")
 
 
 class Verification(BaseModel):

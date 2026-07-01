@@ -14,7 +14,7 @@
   - ✅ 阶段3：orchestrator 解耦 + 修签名 bug（source→bom_source、删多余 json、sequence→seq）
   - ✅ 阶段4：main.py → app/api/routers + services 分层
   - ✅ 阶段5：修 5 个坏测试 + 删 recorder
-- **调优闭环执行中（PR1 契约+DB 地基）**：spec + 计划已完成，PR1-T1 已落地（schemas/bom_delta.py BOMDelta 契约，TDD 2 项测试通过）。下一步：PR1-T2（DiagnosisResult 加 root_component/severity）→ PR1-T3（models 改 + alembic 0003）→ PR1-T4（文档同步 + 开 PR 等杨力 review）
+- **调优闭环执行中（PR1 契约+DB 地基）**：spec + 计划已完成，PR1-T1/T2 已落地（T1: schemas/bom_delta.py BOMDelta 契约；T2: DiagnosisResult 加 root_component/severity 枚举）。下一步：PR1-T3（models 改 + alembic 0003）→ PR1-T4（文档同步 + 开 PR 等杨力 review）
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
@@ -41,6 +41,7 @@
 | 07-01 | 调优闭环设计 | docs/superpowers/specs/2026-07-01-tuning-loop-design.md | brainstorm 5 段：4 节点独立 service(走法A) + BOMDelta 契约 + TuningRepository + alembic 0003(trace_json+pending_deltas) + 乐观锁 + root_component 归因路由 + 务实档；自审已修 4 处 |
 | 07-01 | 调优闭环计划 | docs/superpowers/plans/2026-07-01-tuning-loop.md | writing-plans：三批 PR × 13 task（契约+DB / logic+prompt / service+API），每 task TDD（写测试→实现→commit），含完整代码骨架+测试 |
 | 07-01 | 调优-PR1-T1 | schemas/bom_delta.py + tests/tuning/test_bom_delta.py | 新增 BOMDelta 契约（optimize 产出/apply 输入/审计源）：ModificationType 6值 + Modification(before/after/reason/diagnosis_ids 对齐 rule_modifications 审计表) + BOMDelta(block_code/from_version/fix_targets/modifications/coverage_note/regression_warnings)；TDD 2 项测试通过 |
+| 07-01 | 调优-PR1-T2 | enums/diagnosis_enums.py + enums/__init__.py + schemas/diagnosis.py + tests/tuning/test_diagnosis_ext.py | DiagnosisResult 加 root_component（归因路由 extraction→进 optimize / dq→交新平台）+ severity（normal/fatal 严重性分级）；RootComponent/Severity 走 enums 唯一事实源不内联；TDD 2 项测试通过 + test_verify.py 回归不破 |
 
 ### 阻塞
 - 暂无
