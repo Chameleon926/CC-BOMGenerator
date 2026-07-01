@@ -14,7 +14,7 @@
   - ✅ 阶段3：orchestrator 解耦 + 修签名 bug（source→bom_source、删多余 json、sequence→seq）
   - ✅ 阶段4：main.py → app/api/routers + services 分层
   - ✅ 阶段5：修 5 个坏测试 + 删 recorder
-- **下一步：Step 3 Agent 化**（BaseSkill 加 reads/writes、orchestrator 彻底解耦 DB）
+- **下一步：调优闭环**（diagnose → optimize → apply → evaluate）—— 这才是保障准确率的核心引擎；原「Step 3 Agent 化」经评估为过度工程，已砍掉（决策与理由见技术文档 10.5 节）
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
@@ -55,7 +55,7 @@
 - **你负责的文件**（见下方协作矩阵）：
   - `nodes/skills/ingest_skill.py`（如用 Skill 模式）或 `services/ingest_service.py`
   - Excel 解析、去重、清洗 → 输出 CleanedTestSet
-  - 也可以写 `db/recorder.py` 的优化（session 管理）
+  - 也可以提 PR 优化 `db/repository.py`（session 管理）
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
@@ -66,4 +66,4 @@
 - 暂无
 
 ### 待对方
-- 等 Step 2 分层重构完成（contracts→schemas 目录搬移）后再开工，避免路径冲突
+- Step 2 分层重构已完成（contracts→schemas、recorder→Repository、main→api/services 分层），可基于重构结果开工
