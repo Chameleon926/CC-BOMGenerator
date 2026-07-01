@@ -1,171 +1,262 @@
-"""SQLAlchemy ORM 模型 —— 版本追溯 + LLM 交互 + 管线执行 + 修订原因。"""
+"""
+SQLAlchemy ORM 模型（v2）—— 三方审查后定稿。
+
+变更清单（vs v1）：
+- 避 MySQL 保留字：source→bom_source, status→bom_status, model→model_name, sequence→seq
+- 加唯一约束：(block_code, version) on bom_versions, (block_code, item_code) on clause_items
+- 加 ondelete=RESTRICT 到所有 FK
+- 所有 created_at/updated_at 用 server_default=func.now()
+- 补 approver/approved_at 到 rule_modifications（对齐 alembic 0001）
+- 补 succeeded_by_id/prompt_version/updated_at 到 bom_versions
+- 补 retry_round 到 node_executions
+- 补 coverage_threshold 到 clause
+- 补 cost 到 llm_calls
+- 补 retry_rounds_json 到 pipeline_runs
+- 删 pipeline_runs.bom_version_id（消除环形 FK）
+- rule_modifications before/after 改 JSON
+- 新增 5 张表：clause_items, platform_runs, badcases, diagnoses, desensitization_logs
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, Float, Boolean,
-    ForeignKey, JSON, Enum as SAEnum,
+    Column, Integer, String, Text, DateTime, Float, Boolean, Numeric,
+    ForeignKey, JSON, UniqueConstraint, Index,
+    func,
 )
 from sqlalchemy.orm import relationship
 
 from . import Base
 
 
-# ==================== 核心模型 ====================
-
 class Clause(Base):
     """条款注册表。"""
-    __tablename__ = "clause"
+    __tablename__ = "clauses"
 
-    block_code = Column(String(64), primary_key=True, comment="语义块编码")
-    block_name = Column(String(128), nullable=False, comment="条款名称")
-    domain = Column(String(32), default="", comment="业务域（采购/销售/服务/工程/框架）")
-    current_version = Column(Integer, default=0, comment="当前最新 BOM 版本号")
+    block_code = Column(String(64), primary_key=True)
+    block_name = Column(String(128), nullable=False)
+    domain = Column(String(32), nullable=False, server_default="")
+    current_version = Column(Integer, server_default="0")
+    coverage_threshold = Column(Float, server_default="0.8", comment="覆盖率阈值，默认80%")
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    __table_args__ = (
+        UniqueConstraint("block_code", "domain", name="uq_clause_domain"),
+    )
+
+
+class ClauseItem(Base):
+    """条款子项表（item 级语义块）。"""
+    __tablename__ = "clause_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False)
+    item_code = Column(String(64), nullable=False)
+    item_name = Column(String(128), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("block_code", "item_code", name="uq_clause_item"),
+    )
 
 
 class BomVersion(Base):
-    """BOM 版本快照 —— 每版 BOM + 提示词 + LLM 调用链路。"""
-    __tablename__ = "bom_version"
+    """BOM 版本快照。"""
+    __tablename__ = "bom_versions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    block_code = Column(String(64), ForeignKey("clause.block_code"), nullable=False, index=True)
-    version = Column(Integer, nullable=False, comment="版本号，自增")
+    block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
 
-    # 来源
-    source = Column(String(16), nullable=False, comment="generate / optimize / manual")
-    previous_bom_id = Column(Integer, ForeignKey("bom_version.id"), nullable=True, comment="基于哪个版本优化而来")
+    bom_source = Column(String(16), nullable=False, comment="generate/optimize/manual")
+    previous_bom_id = Column(Integer, ForeignKey("bom_versions.id", ondelete="RESTRICT"), nullable=True)
+    succeeded_by_id = Column(Integer, ForeignKey("bom_versions.id", ondelete="RESTRICT"), nullable=True, comment="被哪个版本取代")
 
-    # BOM 快照（三个核心字段分拆，方便前端高亮 diff）
-    semantic_definition = Column(Text, default="", comment="语义定义")
-    extraction_rules_json = Column(JSON, default=dict, comment="抽取规则 JSON")
-    recall_profile_json = Column(JSON, default=dict, comment="召回画像 JSON")
+    bom_status = Column(String(16), server_default="draft", comment="draft/reviewed/deactivated")
 
-    # 完整产物
-    full_bom_json = Column(JSON, default=dict, comment="完整 BOM JSON")
-    prompt_text = Column(Text, default="", comment="该版本对应的完整提示词")
+    semantic_definition = Column(Text, default="")
+    full_bom_json = Column(JSON, comment="完整 BOM JSON（权威真源）")
+    prompt_text = Column(Text, default="")
+    prompt_version = Column(String(32), server_default="", comment="prompt 模板版本")
 
-    # 状态
-    status = Column(String(16), default="draft", comment="draft / reviewed / deactivated")
+    pipeline_run_id = Column(Integer, ForeignKey("pipeline_runs.id", ondelete="SET NULL"), nullable=True)
 
-    # 管线执行
-    pipeline_run_id = Column(Integer, ForeignKey("pipeline_runs.id"), nullable=True, comment="对应的管线执行记录")
+    created_by = Column(String(32), server_default="")
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    # 审计
-    created_by = Column(String(32), default="", comment="操作人")
-    created_at = Column(DateTime, default=datetime.now)
+    __table_args__ = (
+        UniqueConstraint("block_code", "version", name="uq_bom_version"),
+    )
 
-    # 关系
-    clause = relationship("Clause", foreign_keys=[block_code])
-    previous_bom = relationship("BomVersion", remote_side=[id], foreign_keys=[previous_bom_id])
-
-
-# ==================== 管线执行追溯 ====================
 
 class PipelineRun(Base):
-    """每次 generate / optimize 管线执行记录。"""
+    """管线执行记录。"""
     __tablename__ = "pipeline_runs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    block_code = Column(String(64), ForeignKey("clause.block_code"), nullable=False, index=True)
-    mode = Column(String(16), nullable=False, comment="generate / optimize")
-    status = Column(String(16), default="running", comment="running / success / fail")
+    block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False, index=True)
+    mode = Column(String(16), nullable=False, comment="generate/optimize")
+    run_status = Column(String(16), server_default="running", comment="running/success/fail")
 
-    # 入参/产出快照
-    input_cleaned_json = Column(JSON, default=dict, comment="入参快照（CleanedTestSet）")
-    output_bom_json = Column(JSON, nullable=True, comment="产出 BOM JSON（最终版）")
-    output_prompt_text = Column(Text, default="", comment="产出完整提示词")
+    input_cleaned_json = Column(JSON)
+    output_bom_json = Column(JSON)
+    output_prompt_text = Column(Text, default="")
 
-    # 性能
-    started_at = Column(DateTime, default=datetime.now)
+    retry_count = Column(Integer, server_default="0")
+    retry_rounds_json = Column(JSON, comment="每轮回修的触发原因数组")
+
+    started_at = Column(DateTime, server_default=func.now())
     finished_at = Column(DateTime, nullable=True)
-    duration_ms = Column(Integer, nullable=True, comment="总耗时")
-    error_message = Column(Text, nullable=True, comment="错误信息（fail 时填写）")
+    duration_ms = Column(Integer, nullable=True)
+    error_message = Column(Text, nullable=True)
 
-    # 回修记录
-    retry_count = Column(Integer, default=0, comment="回修次数")
-    bom_version_id = Column(Integer, ForeignKey("bom_version.id"), nullable=True, comment="产出的 BOM 版本")
-
-    # 关系
-    clause = relationship("Clause", foreign_keys=[block_code])
     nodes = relationship("NodeExecution", back_populates="pipeline_run")
 
 
 class NodeExecution(Base):
-    """每个 Skill 节点的执行记录。"""
+    """Skill 节点执行记录。"""
     __tablename__ = "node_executions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    pipeline_run_id = Column(Integer, ForeignKey("pipeline_runs.id"), nullable=False, index=True)
-    skill_name = Column(String(64), nullable=False, comment="Skill 名称，如 DefinitionRuleSkill")
-    sequence = Column(Integer, nullable=False, comment="执行顺序（1/2/3...）")
-    is_retry = Column(Boolean, default=False, comment="是否是回修执行")
+    pipeline_run_id = Column(Integer, ForeignKey("pipeline_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    skill_name = Column(String(64), nullable=False)
+    seq = Column(Integer, nullable=False, comment="执行顺序")
+    retry_round = Column(Integer, server_default="0", comment="0=首次，1+=第几次回修")
+    is_retry = Column(Boolean, server_default="0")
 
-    # 输入/输出快照
-    input_json = Column(JSON, nullable=True, comment="输入快照")
-    output_json = Column(JSON, nullable=True, comment="输出快照（LLM 回调时记录）")
+    input_json = Column(JSON)
+    output_json = Column(JSON)
 
-    # 性能
-    started_at = Column(DateTime, default=datetime.now)
+    started_at = Column(DateTime, server_default=func.now())
     duration_ms = Column(Integer, nullable=True)
-    success = Column(Boolean, default=True)
+    success = Column(Boolean, server_default="1")
 
-    # 关系
     pipeline_run = relationship("PipelineRun", back_populates="nodes")
     llm_calls = relationship("LlmCall", back_populates="node_execution")
 
 
 class LlmCall(Base):
-    """每次大模型调用的完整记录。"""
+    """大模型调用记录。"""
     __tablename__ = "llm_calls"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    node_execution_id = Column(Integer, ForeignKey("node_executions.id"), nullable=True, index=True)
+    node_execution_id = Column(Integer, ForeignKey("node_executions.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    api_format = Column(String(16), default="openai", comment="openai / anthropic")
-    model = Column(String(64), default="", comment="使用的模型名称")
-    temperature = Column(Float, default=0.3)
-    max_retries = Column(Integer, default=1)
+    api_format = Column(String(16), server_default="openai")
+    model_name = Column(String(64), server_default="", comment="模型名称")
+    temperature = Column(Float, server_default="0.3")
+    max_retries = Column(Integer, server_default="1")
 
-    # 核心：完整的输入输出
-    system_prompt = Column(Text, nullable=True, comment="system prompt 内容")
-    user_prompt = Column(Text, nullable=True, comment="user prompt 内容")
-    assistant_response = Column(Text, nullable=True, comment="assistant 返回文本")
-    raw_response = Column(Text, nullable=True, comment="原始返回（含 thinking 等）")
+    system_prompt = Column(Text)
+    user_prompt = Column(Text)
+    assistant_response = Column(Text)
+    raw_response = Column(Text, comment="原始返回（含thinking，排查用）")
 
-    # 调用结果
-    tokens_in = Column(Integer, nullable=True, comment="输入 tokens（非精确，后端有项即填）")
-    tokens_out = Column(Integer, nullable=True, comment="输出 tokens")
-    duration_ms = Column(Integer, nullable=True, comment="此次调用的网络耗时")
-    success = Column(Boolean, default=True)
-    error_message = Column(Text, nullable=True, comment="失败时的错误信息")
+    tokens_in = Column(Integer, nullable=True)
+    tokens_out = Column(Integer, nullable=True)
+    cost = Column(Numeric(10, 6), nullable=True, comment="单次调用成本")
+    duration_ms = Column(Integer, nullable=True)
+    success = Column(Boolean, server_default="1")
+    error_message = Column(Text)
 
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, server_default=func.now())
 
-    # 关系
     node_execution = relationship("NodeExecution", back_populates="llm_calls")
 
 
-# ==================== 修订原因 ====================
-
 class RuleModification(Base):
-    """每次规则/定义改动的记录（为什么改、谁改的）。"""
+    """规则修订记录。"""
     __tablename__ = "rule_modifications"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    bom_version_id = Column(Integer, ForeignKey("bom_version.id"), nullable=False, index=True)
-    modification_type = Column(String(32), nullable=False, comment="definition / interception / match / keyword / confusion / profile")
-    reason = Column(Text, default="", comment="为什么改（fixes字段内容）")
-
-    # 改动前后的内容（用于 diff 高亮）
-    before_text = Column(Text, nullable=True, comment="改动前的内容")
-    after_text = Column(Text, nullable=True, comment="改动后的内容")
-
-    operator = Column(String(32), default="", comment="操作人")
-    created_at = Column(DateTime, default=datetime.now)
+    bom_version_id = Column(Integer, ForeignKey("bom_versions.id", ondelete="RESTRICT"), nullable=False, index=True)
+    modification_type = Column(String(32), nullable=False, comment="definition/interception/match/keyword/confusion/profile")
+    reason = Column(Text, server_default="")
+    before_json = Column(JSON, comment="改动前内容（结构化）")
+    after_json = Column(JSON, comment="改动后内容（结构化）")
+    operator = Column(String(32), server_default="")
+    approver = Column(String(32), nullable=True, comment="审批人")
+    approved_at = Column(DateTime, nullable=True, comment="审批时间")
+    created_at = Column(DateTime, server_default=func.now())
 
     bom_version = relationship("BomVersion", foreign_keys=[bom_version_id])
+
+
+class TestSetImport(Base):
+    """测试集导入追溯。"""
+    __tablename__ = "test_set_imports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False)
+    file_name = Column(String(256), nullable=False)
+    file_hash = Column(String(64), comment="MD5/SHA256，防重复导入")
+    original_count = Column(Integer)
+    after_dedup = Column(Integer)
+    domain = Column(String(32))
+    imported_by = Column(String(32), server_default="")
+    imported_at = Column(DateTime, server_default=func.now())
+
+
+class PlatformRun(Base):
+    """平台跑分记录。"""
+    __tablename__ = "platform_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False, index=True)
+    bom_version_id = Column(Integer, ForeignKey("bom_versions.id", ondelete="SET NULL"), nullable=True)
+    accuracy = Column(Float)
+    miss_count = Column(Integer, server_default="0")
+    fp_count = Column(Integer, server_default="0")
+    total_samples = Column(Integer, server_default="0")
+    platform_batch = Column(String(64), comment="平台跑批号")
+    imported_at = Column(DateTime, server_default=func.now())
+
+
+class Badcase(Base):
+    """错例记录。"""
+    __tablename__ = "badcases"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    platform_run_id = Column(Integer, ForeignKey("platform_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False)
+    doc_id = Column(String(128))
+    case_type = Column(String(16), nullable=False, comment="miss/false_positive")
+    expected = Column(Text)
+    actual = Column(Text)
+    overall_coverage = Column(Float, comment="整体覆盖率")
+    segment_coverage = Column(Float, comment="单段覆盖率")
+    reason = Column(String(256))
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Diagnosis(Base):
+    """归因诊断。"""
+    __tablename__ = "diagnoses"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    badcase_id = Column(Integer, ForeignKey("badcases.id", ondelete="CASCADE"), nullable=False, index=True)
+    category = Column(String(16), nullable=False, comment="召回问题/混合问题/BOM问题/Prompt模板待优化/大模型推理问题")
+    root_cause = Column(Text)
+    suggested_fix = Column(Text)
+    fix_target = Column(String(16), server_default="rules", comment="rules/recall_profile/both")
+    confidence = Column(String(8), server_default="中", comment="高/中/低")
+    trace_available = Column(Boolean, server_default="0")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class DesensitizationLog(Base):
+    """脱敏审计日志。"""
+    __tablename__ = "desensitization_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    operator = Column(String(32), nullable=False)
+    operation_type = Column(String(16), nullable=False, comment="generate/optimize/manual")
+    block_code = Column(String(64))
+    doc_ids = Column(Text, comment="涉及文档ID（逗号分隔）")
+    rule_version = Column(String(32), comment="脱敏规则版本")
+    mapping_snapshot = Column(JSON, comment="脱敏映射表快照")
+    created_at = Column(DateTime, server_default=func.now())
