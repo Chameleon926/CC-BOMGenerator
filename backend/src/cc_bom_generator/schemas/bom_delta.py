@@ -1,25 +1,15 @@
 """optimize 产出的 BOM 改动清单契约（对齐 db.rule_modifications 审计表）。"""
 from __future__ import annotations
 
-from enum import Enum
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-from ..enums import FixTarget
-
-
-class ModificationType(str, Enum):
-    DEFINITION = "definition"
-    INTERCEPTION = "interception"
-    MATCH = "match"
-    KEYWORD = "positive_keywords"
-    CONFUSION = "confusion_words"
-    PROFILE = "profile"
+from ..enums import FixTarget, ModificationType, ModificationAction
 
 
 class Modification(BaseModel):
     type: ModificationType
-    action: str = Field("update", description="add/update/delete")
+    action: ModificationAction = Field(ModificationAction.UPDATE, description="add/update/delete")
     target: str = Field("", description="定位锚点（某条 rule 文本 / 某关键词原文）")
     before: Optional[dict] = Field(None, description="改前片段（对齐 rule_modifications.before_json）")
     after: Optional[dict] = Field(None, description="改后片段（对齐 rule_modifications.after_json）")

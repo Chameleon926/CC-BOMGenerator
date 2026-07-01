@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.cc_bom_generator.schemas.bom_delta import (
     BOMDelta, Modification, ModificationType
 )
-from src.cc_bom_generator.enums import FixTarget
+from src.cc_bom_generator.enums import FixTarget, ModificationAction
 
 
 def test_modification_minimal():
@@ -30,3 +30,6 @@ def test_bom_delta_full():
     assert len(delta.modifications) == 1
     assert delta.modifications[0].type == ModificationType.MATCH
     assert delta.regression_warnings[0].startswith("删关键词")
+    assert delta.fix_targets == [FixTarget.RULES]
+    assert delta.modifications[0].after == {"rule": "新"}
+    assert delta.modifications[0].action == ModificationAction.UPDATE
