@@ -105,7 +105,7 @@ CC-BOMGenerator/
 │  │  │  ├─ orchestrator.py     # 管线编排器（含回修+写库）
 │  │  │  ├─ pipeline.py        # 入口（调 orchestrator）
 │  │  │  └─ skills/            # 唯一实现：7 个 Skill + 5 个内部 logic（_*_logic.py）
-│  │  ├─ db/                   # SQLAlchemy ORM（12 张表）+ recorder + Alembic
+│  │  ├─ db/                   # SQLAlchemy ORM（12 张表）+ Repository + Alembic
 │  │  ├─ llm/                  # LLM 客户端（双格式 OpenAI/Anthropic）
 │  │  ├─ logging_config.py     # 统一日志（log.info/log.error）
 │  │  └─ main.py               # FastAPI 入口（待拆为 api/routers/）
@@ -136,7 +136,8 @@ nodes/pipeline.py                     林大宇    ❌      管线入口
 nodes/base.py                         林大宇    ❌      BaseSkill 基类
 nodes/skills/                         林大宇    ❌      B模块 Skill + 内部 logic
 db/models.py                          林大宇    ❌      ORM 表定义
-db/recorder.py                        林大宇    可优化   写库逻辑（杨力可提PR优化session管理）
+db/repository.py                      林大宇    ❌      Repository 写库（run 级 UoW），改=PR+通知
+db/recorder.py                        林大宇    待删     阶段5 删除（功能已迁 repository.py）
 db/__init__.py                        林大宇    ❌      Engine + Session
 llm/client.py                         林大宇    可优化   LLM 客户端（杨力可提PR加超时/重试）
 logging_config.py                      林大宇    ❌      日志配置

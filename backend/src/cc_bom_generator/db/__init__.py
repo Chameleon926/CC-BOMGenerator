@@ -1,12 +1,14 @@
-"""数据库初始化 —— Engine + Session 工厂。"""
+"""数据库初始化 —— Engine + Session 工厂 + 事务上下文 + Repository。"""
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Generator
 
 import yaml
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import Session, sessionmaker, declarative_base
 
 # 读配置
 _ROOT = Path(__file__).resolve().parents[3]  # backend/src/cc_bom_generator/db → backend
@@ -35,11 +37,43 @@ SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
 
-def get_session():
-    """获取数据库会话（上下文管理器用法）。"""
+@contextmanager
+def session_scope() -> Generator[Session, None, None]:
+    """同步事务上下文（供非 HTTP 入口用，如 nodes.pipeline.generate_bom）。
+
+    出块统一 commit / 异常 rollback / 结束 close。
+    一次管线 run 包在一个 session_scope 里 = 一个事务（run 级 Unit-of-Work）。
+    """
     session = SessionLocal()
     try:
-        return session
+        yield session
+        session.commit()
     except Exception:
-        session.close()
+        session.rollback()
         raise
+    finally:
+        session.close()
+
+
+def get_db() -> Generator[Session, None, None]:
+    """FastAPI 依赖：yield session 给路由，**不 commit**（事务边界由 service 层控制）。"""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+def get_session() -> Session:
+    """[已废弃] 裸 Session 工厂，不管理生命周期。新代码用 session_scope() 或 get_db()。"""
+    return SessionLocal()
+
+
+# 放在末尾避免循环 import（repository 只依赖 .models，models 依赖上方已定义的 Base）
+from .repository import PipelineRepository  # noqa: E402
+
+__all__ = [
+    "engine", "SessionLocal", "Base",
+    "session_scope", "get_db", "get_session",
+    "PipelineRepository", "DATABASE_URL",
+]
