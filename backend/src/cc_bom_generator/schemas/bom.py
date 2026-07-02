@@ -1,7 +1,7 @@
 """语义 BOM 核心产物契约。"""
 
 from __future__ import annotations
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 from datetime import datetime
 
@@ -10,6 +10,8 @@ from ..enums import BomSource, BOMStatus
 
 class ExtractionRule(BaseModel):
     rule: str = Field(..., description="纯规则逻辑（命中/提取条件）, 不改写 platform 预期输出")
+    scene: str = Field("", description="场景名（如「供应商主动付款」「退款推演陷阱」），用于分场景归属")
+    logic: str = Field("", max_length=120, description="拦截/匹配逻辑，引导推理（限长 120，防 LLM 写长段稀释提示词）")
     fixes: str = Field("", description="修订依据（人审用，不录入 platform 规则）")
 
 
@@ -20,6 +22,25 @@ class ExtractionRules(BaseModel):
     core_match_rules: List[ExtractionRule] = Field(
         default_factory=list, description="核心匹配规则（提取条件，针对漏抽）"
     )
+    poison_words: List[str] = Field(
+        default_factory=list, description="毒药词（一票否决，命中即放弃）"
+    )
+
+    @model_validator(mode="after")
+    def _normalize_poison_words(self) -> "ExtractionRules":
+        """契约自守：去重(保序) + trim + 去空。"""
+        self.poison_words = list(dict.fromkeys(
+            w.strip() for w in self.poison_words if w and w.strip()
+        ))
+        return self
+
+
+class SceneJudgment(BaseModel):
+    """判例分析：脱敏后的正反例短句 + 分析逻辑，进提示词以引导推理。"""
+    scene: str = Field(..., description="场景名")
+    negative_case: str = Field("", description="脱敏反例短句")
+    positive_case: str = Field("", description="脱敏正例短句")
+    analysis: str = Field("", description="分析逻辑（为何此场景需如此判定）")
 
 
 class RecallProfile(BaseModel):
@@ -38,6 +59,9 @@ class RecallProfile(BaseModel):
     positive_examples: List[str] = Field(
         default_factory=list, description="正例参考（召回锚点，不再进抽取提示词）"
     )
+    negative_examples: List[str] = Field(
+        default_factory=list, description="反例召回锚点（不进提示词，无分析）"
+    )
 
 
 class BOM(BaseModel):
@@ -53,6 +77,12 @@ class BOM(BaseModel):
     )
     recall_profile: RecallProfile = Field(
         default_factory=RecallProfile, description="召回画像"
+    )
+    reasoning_chain: List[str] = Field(
+        default_factory=list, description="思维链/排雷步骤，进提示词引导推理"
+    )
+    scene_judgments: List[SceneJudgment] = Field(
+        default_factory=list, description="判例分析（脱敏正反例 + 分析逻辑）"
     )
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
 
