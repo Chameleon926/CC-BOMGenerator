@@ -52,12 +52,17 @@ def verify_bom(
     if not negative_examples:
         negatives_text = "（无，本次为生成场景，暂无误抽反例）"
 
+    # reasoning_chain：把排雷步骤铺成编号列表喂给 LLM，强制先走完再判
+    # （三类业务致命错：资金方向反/主体错位/毒药词误伤正例，靠字面命中抓不住）
+    reasoning_chain_text = _format_chain(bom.reasoning_chain)
+
     # ---- 渲染提示词 ----
     user_prompt = render_prompt(
         "verify",
         bom_json=bom_json,
         positives=positives_text,
         negatives=negatives_text,
+        reasoning_chain=reasoning_chain_text,
     )
 
     system_prompt = render_prompt("system")
@@ -105,4 +110,17 @@ def _format_list(items: List[str], label: str = "") -> str:
     lines = [f"{prefix}"]
     for i, item in enumerate(items, 1):
         lines.append(f"  ({i}) {item}")
+    return "\n".join(lines)
+
+
+def _format_chain(steps: List[str]) -> str:
+    """格式化 reasoning_chain（排雷步骤）为编号列表。
+
+    空链给一句占位，避免提示词里出现空白段落误导 LLM。
+    """
+    if not steps:
+        return "（无，本 BOM 未沉淀 reasoning_chain）"
+    lines = []
+    for i, step in enumerate(steps, 1):
+        lines.append(f"  ({i}) {step}")
     return "\n".join(lines)
