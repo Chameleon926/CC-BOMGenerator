@@ -35,18 +35,23 @@ class GenerationOrchestrator:
         self.max_retries = max_retries
         self.retry_skills = retry_skills or self._default_retry_skills()
 
-    def run(self, state: GenerationState, repo: "PipelineRepository") -> GenerationState:
-        """执行完整管线，通过 repo 记录到数据库（事务由调用层控制）。"""
+    def run(self, state: GenerationState, repo: "PipelineRepository", run_id: int | None = None) -> GenerationState:
+        """执行完整管线，通过 repo 记录到数据库（事务由调用层控制）。
+
+        run_id: 异步场景由调用方先 start_pipeline_run 拿到 run_id 并返回给前端，
+                再起线程调本方法（传入 run_id）跑剩余节点；不传则内部创建。
+        """
         cleaned = state.cleaned
         log.info(f"管线启动: 条款={cleaned.clause} ({cleaned.block_code}), 正例数={len(cleaned.positive_values)}")
 
-        # ---- 写库：创建 pipeline_run ----
-        run_id = repo.start_pipeline_run(
-            block_code=cleaned.block_code,
-            block_name=cleaned.clause,
-            mode="generate",
-            input_cleaned_json=cleaned.model_dump(mode="json"),
-        )
+        # ---- 写库：创建 pipeline_run（异步场景已由调用方创建，复用 run_id）----
+        if run_id is None:
+            run_id = repo.start_pipeline_run(
+                block_code=cleaned.block_code,
+                block_name=cleaned.clause,
+                mode="generate",
+                input_cleaned_json=cleaned.model_dump(mode="json"),
+            )
         state._pipeline_run_id = run_id
 
         error_msg = None
@@ -189,23 +194,57 @@ class GenerationOrchestrator:
         return "; ".join(parts) if parts else "未知问题"
 
     def _build_retry_bom_text(self, state: GenerationState) -> str:
+        """拼当前 BOM 文本作为 DefinitionRuleSkill 的 current_bom 种子。
+
+        含全精细字段（logic/poison_words/reasoning_chain/scene_judgments）+ 上轮自检/校验问题，
+        使 gen_stage1 回修时能看到上轮精细规则而非退化为粗规则。空列表优雅跳过。
+        """
         if state.bom is None:
             return "（无）"
-        parts = [f"当前定义：{state.bom.semantic_definition}", f"\n当前规则："]
-        for r in state.bom.extraction_rules.absolute_interception_rules:
-            parts.append(f"  拦截：{r.rule}")
-        for r in state.bom.extraction_rules.core_match_rules:
-            parts.append(f"  匹配：{r.rule}")
-        if not state.rule_check_passed:
-            killed = state.rule_check_details.get('killed_examples', [])
-            if killed:
-                parts.append(f"\n⚠️ 上轮问题：拦截规则误杀了以下正例，请修正：")
-                for k in killed:
-                    parts.append(f"  - '{k['example']}' 被关键词 '{k['killed_by']}' 命中")
-        if state.verification and state.verification.red_flags:
-            parts.append(f"\n⚠️ 自检红旗：")
-            for flag in state.verification.red_flags:
-                parts.append(f"  - {flag}")
+        bom = state.bom
+        parts = [f"当前定义：{bom.semantic_definition}", "当前规则："]
+
+        # 【拦截】（命中即放弃）
+        if bom.extraction_rules.absolute_interception_rules:
+            parts.append("【拦截】（命中即放弃）")
+            for r in bom.extraction_rules.absolute_interception_rules:
+                logic = f"（逻辑：{r.logic}）" if r.logic else ""
+                scene = f"[{r.scene}] " if r.scene else ""
+                parts.append(f"  - {scene}{r.rule}{logic}")
+
+        # 【匹配】（满足即提取）
+        if bom.extraction_rules.core_match_rules:
+            parts.append("【匹配】（满足即提取）")
+            for r in bom.extraction_rules.core_match_rules:
+                logic = f"（逻辑：{r.logic}）" if r.logic else ""
+                scene = f"[{r.scene}] " if r.scene else ""
+                parts.append(f"  - {scene}{r.rule}{logic}")
+
+        # 【毒药词】（一票否决）
+        if bom.extraction_rules.poison_words:
+            parts.append(f"【毒药词】（一票否决）：{', '.join(bom.extraction_rules.poison_words)}")
+
+        # 【思维链】（排雷步骤）
+        if bom.reasoning_chain:
+            parts.append("【思维链】（排雷步骤）：")
+            for step in bom.reasoning_chain:
+                parts.append(f"  - {step}")
+
+        # 【判例分析】
+        if bom.scene_judgments:
+            parts.append("【判例分析】：")
+            for sj in bom.scene_judgments:
+                scene = f"[{sj.scene}] " if sj.scene else ""
+                parts.append(
+                    f"  - {scene}反例：{sj.negative_case} | 正例：{sj.positive_case} | 分析：{sj.analysis}"
+                )
+
+        # ⚠️ 上轮自检/校验问题（red_flags + 误杀正例注入种子，回修时针对性修）
+        feedback = self._collect_retry_feedback(state)
+        if feedback and feedback != "未知问题":
+            parts.append("⚠️ 上轮自检/校验问题：")
+            parts.append(feedback)
+
         return "\n".join(parts)
 
     def _default_retry_skills(self) -> List[BaseSkill]:
@@ -213,7 +252,8 @@ class GenerationOrchestrator:
         from .skills.profile_build_skill import ProfileBuildSkill
         from .skills.rule_check import RuleCheckSkill
         from .skills.self_check import SelfCheckSkill
-        return [DefinitionRuleSkill(), ProfileBuildSkill(), RuleCheckSkill(), SelfCheckSkill()]
+        from .skills.prompt_assemble_skill import PromptAssembleSkill
+        return [DefinitionRuleSkill(), ProfileBuildSkill(), RuleCheckSkill(), SelfCheckSkill(), PromptAssembleSkill()]
 
 
 def create_default_orchestrator() -> GenerationOrchestrator:
