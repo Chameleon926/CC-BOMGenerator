@@ -12,6 +12,7 @@
 - section_hints：恰好 {{nsec}} 个，该条款最可能出现的合同章节名。
 - semantic_queries：{{nq}} 句，是对语义定义的自然语言改写（供向量语义召回）。
 - positive_examples（召回锚点，新平台用于向量召回、不进抽取提示词）：从候选里【精选】几条最具代表性、互相差异大的召回锚点；不要整段堆砌全部候选，禁止编造。{{lang}}
+- negative_examples（反例召回锚点，召回排除用）：从定义反推本条款【不该匹配】的典型反例（脱敏短句）；【不进抽取提示词、无需分析原因】，与 positive_examples 互为对照。例如押金条款的反例可以是"供应商应向采购方交纳履约保证金"。
 </派生约束>
 
 <第1阶段定义与规则>{{stage1_json}}</第1阶段定义与规则>
@@ -20,7 +21,7 @@
 
 <输出格式>只输出一个合法 JSON 对象：
 {
-  "recall_profile": {"positive_keywords":[],"confusion_words":[],"section_hints":[],"semantic_queries":[],"positive_examples":[]},
+  "recall_profile": {"positive_keywords":[],"confusion_words":[],"section_hints":[],"semantic_queries":[],"positive_examples":[],"negative_examples":[]},
   "derivation_check": "画像各字段如何派生自第1阶段定义/规则（自证不脱节）"
 }
 </输出格式>

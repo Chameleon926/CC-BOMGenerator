@@ -149,12 +149,16 @@ def _merge_profile(
         if ex not in merged_examples and len(merged_examples) < 5:
             merged_examples.append(ex)
 
+    # 反例：从大模型取，去空 + trim + 保序去重 + 限 5（与 positive_examples 同模式）
+    neg_examples = _dedup_trim(llm_profile.get("negative_examples", []), limit=5)
+
     return RecallProfile(
         positive_keywords=merged_kw[:nkw],
         confusion_words=merged_conf[:6],
         section_hints=section_hints,
         semantic_queries=semantic_queries,
         positive_examples=merged_examples[:5],
+        negative_examples=neg_examples,
     )
 
 
@@ -183,6 +187,21 @@ def _sanitize_keywords(keywords: List[str]) -> List[str]:
             continue
         seen.add(kw)
         result.append(kw)
+    return result
+
+
+def _dedup_trim(items: List[str], limit: int = 5) -> List[str]:
+    """去空 + trim + 保序去重 + 限量。用于解析大模型返回的示例文本列表。"""
+    result: List[str] = []
+    seen = set()
+    for it in items:
+        it = (it or "").strip()
+        if not it or it in seen:
+            continue
+        if len(result) >= limit:
+            break
+        seen.add(it)
+        result.append(it)
     return result
 
 
