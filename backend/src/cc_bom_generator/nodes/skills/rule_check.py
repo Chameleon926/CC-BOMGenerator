@@ -2,6 +2,8 @@
 
 准确率保障：确定性检查，替代 LLM 盲测。
 - 正例被拦截规则命中 = 硬错误
+- 毒药词命中正例 = 硬错误（毒药词选错了：毒药词应一票否决非本条款，不该命中本条款正例）
+- 拦截规则按 scene 分桶统计 = 场景覆盖率（不直接判 pass/fail，供人审/自检看场景盲区）
 - 匹配规则关键词对正例的命中率 = 覆盖率代理
 """
 
@@ -53,11 +55,26 @@ class RuleCheckSkill(BaseSkill):
 
         hit_rate = hit / len(positives) if positives else 0
 
-        state.rule_check_passed = len(killed) == 0
+        # 3. 毒药词命中正例 = 硬错误（毒药词应一票否决非本条款，命中本条款正例=毒药词选错）
+        poison_words = state.bom.extraction_rules.poison_words
+        poison_hits = []
+        if poison_words:
+            for ex in positives:
+                for pw in poison_words:
+                    if pw and pw in ex:
+                        poison_hits.append({"poison_word": pw, "example": ex[:40]})
+                        break  # 同一正例记一次即可
+
+        # 4. 拦截规则 scene 分桶（不直接判 pass/fail，供人审/自检查场景盲区）
+        scene_coverage = _bucket_scene_coverage(interception_rules)
+
+        state.rule_check_passed = (len(killed) == 0) and (len(poison_hits) == 0)
         state.rule_check_details = {
             "interception_keywords": interception_keywords,
             "match_keywords": match_keywords,
             "killed_examples": killed,
+            "poison_hits": poison_hits,
+            "scene_coverage": scene_coverage,
             "hit_rate": f"{hit}/{len(positives)} = {hit_rate:.0%}",
             "missed_examples": miss,
         }
@@ -68,6 +85,15 @@ class RuleCheckSkill(BaseSkill):
                 print(f"           '{k['example']}...' 被关键词 '{k['killed_by']}' 命中")
         else:
             print(f"  [{self.name}] ✅ 无正例被误杀")
+
+        if poison_hits:
+            print(f"  [{self.name}] ❌ {len(poison_hits)} 个正例被毒药词命中（毒药词选错）！")
+            for p in poison_hits:
+                print(f"           '{p['example']}...' 命中毒药词 '{p['poison_word']}'")
+
+        if scene_coverage:
+            bucket_repr = ", ".join(f"{s}={n}" for s, n in scene_coverage.items())
+            print(f"  [{self.name}] 拦截规则场景覆盖: {bucket_repr}")
 
         print(f"  [{self.name}] 匹配命中率: {hit}/{len(positives)} = {hit_rate:.0%}")
         if miss:
@@ -96,3 +122,17 @@ def _extract_rule_keywords(rules) -> List[str]:
             seen.add(kw)
             result.append(kw)
     return result
+
+
+def _bucket_scene_coverage(rules) -> dict:
+    """按 scene 分桶统计拦截规则数（供人审/自检看场景覆盖盲区）。
+
+    无 scene（空串）的规则归入默认桶 '(未指定场景)'。
+    """
+    coverage: dict = {}
+    for rule_obj in rules:
+        scene = getattr(rule_obj, "scene", "") or ""
+        scene = scene.strip()
+        bucket = scene if scene else "(未指定场景)"
+        coverage[bucket] = coverage.get(bucket, 0) + 1
+    return coverage
