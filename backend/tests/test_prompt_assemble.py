@@ -1,7 +1,19 @@
-"""prompt_assemble.py 单元测试。"""
+"""prompt_assemble.py 单元测试（旧版，已被 skills/test_prompt_assemble_v2.py 取代）。
+
+assemble 升级（generate 升级 T3）后：
+- 模板分离到 prompts/assemble.txt（不再内嵌 _TEMPLATE）
+- _format_rules 重写为分场景 + logic（修 M8）
+- 新增毒药词 / 判例分析 / 思维链展示段
+- 示例（positive/negative_examples）不进提示词
+
+旧测试只覆盖粗粒度断言，且对升级后的语义不再有诊断价值（部分断言靠
+「拦截」「具体文件名」等词在新结构里恰好命中而过，并非真正验证精细字段）。
+完整新结构覆盖见 skills/test_prompt_assemble_v2.py，故此处 skip。
+"""
 
 import sys
 import os
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -11,6 +23,7 @@ from src.cc_bom_generator.schemas.bom import (
 from src.cc_bom_generator.nodes.skills._prompt_logic import assemble_prompt
 
 
+@pytest.mark.skip(reason="已被 skills/test_prompt_assemble_v2.py 取代（assemble T3 升级：分场景+logic+毒药词+判例+思维链，模板分离）")
 def test_assemble_basic():
     """基本测试：组装提示词。"""
     bom = BOM(
