@@ -59,3 +59,6 @@ quick_poc/data/imported/
 node_modules/
 frontend/dist/
 frontend/.vite/
+
+# ===== 本地验证测试集（含真实合同数据，铁律5 不入库）=====
+test/
