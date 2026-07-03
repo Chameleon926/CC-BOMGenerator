@@ -8,13 +8,14 @@
 ## 🟦 林大宇（feature_lindayu）
 
 ### 当前任务
-- **Step 2 分层重构已完成** ✅（5 阶段，5 commit；架构决策见技术文档第 10 章）：
-  - ✅ 阶段1：contracts/ → schemas/ 物理搬移 + import 替换
-  - ✅ 阶段2：recorder.py → PipelineRepository 类（注入 session，run 级 UoW 事务）
-  - ✅ 阶段3：orchestrator 解耦 + 修签名 bug（source→bom_source、删多余 json、sequence→seq）
-  - ✅ 阶段4：main.py → app/api/routers + services 分层
-  - ✅ 阶段5：修 5 个坏测试 + 删 recorder
-- **PR1（契约+DB 地基）全部完成** ✅（T1 BOMDelta + T1-fix 枚举迁 enums + T2 DiagnosisResult 扩展 + T3 models+alembic 0003，alembic 实跑落库 MySQL）。下一步：push + 开 PR1 等**杨力 review**（铁律9：契约改动必须 review），通过后再开 PR2（logic+prompt）
+- **Step 2 分层重构已完成** ✅（5 阶段，5 commit；架构决策见技术文档第 10 章）
+- **调优闭环 PR1（契约+DB 地基）已完成** ✅（spec+plan 落库；T1-T3 commit；alembic 0003 实跑落库）
+- **generate 端到端验证 + 前端 demo + BOM 精细化升级 + 进度反馈修复 全部完成** ✅（2026-07-02）：
+  - generate 验证：修 5 真 bug（编码/JSON/block_code/version）+ 异步化（POST /generate 返 run_id + status/result 端点）
+  - 前端 demo：Vue3 三环节（设计/进度/输出），Vite 代理联调通，多 agent 验证
+  - **generate BOM 精细化升级 T1-T6**（8 task，对标旧平台押金/封顶 prompt）：BOM 加 scene/logic/poison_words/reasoning_chain/scene_judgments/negative_examples；gen_stage1 产精细规则（few-shot 外置）；RuleCheck 读 poison_words+scene 分桶；SelfCheck 走 reasoning_chain 抓方向反/主体错；assemble 展示精细字段（示例不进）；回修链重 assemble+种子带新字段；专家 agent 审视修正 M1-M10
+  - 进度反馈修复：orchestrator commit_after_each（节点级 commit），/status 实时见节点
+- **下一步**：技术文档同步（第4章 generate 算法 + 第8章 BOM 输出对照，反映精细 BOM）+ 回归案例（押金/封顶业务正确性）+ 调优闭环 PR2（logic+prompt）
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
@@ -44,6 +45,11 @@
 | 07-01 | 调优-PR1-T1-fix | enums/bom_enums.py + schemas/bom_delta.py | code review 修正：ModificationType/ModificationAction 迁 enums（唯一事实源，不内联）+ 补扎实测试断言 |
 | 07-01 | 调优-PR1-T2 | enums/diagnosis_enums.py + enums/__init__.py + schemas/diagnosis.py + tests/tuning/test_diagnosis_ext.py | DiagnosisResult 加 root_component（归因路由 extraction→进 optimize / dq→交新平台）+ severity（normal/fatal 严重性分级）；RootComponent/Severity 走 enums 唯一事实源不内联；TDD 2 项测试通过 + test_verify.py 回归不破 |
 | 07-01 | 调优-PR1-T3 | db/models.py + alembic/versions/0003_badcase_trace_and_pending_deltas.py | Badcase 加 trace_json + 新增 PendingDelta ORM（8字段，from_bom_version_id FK 乐观锁基线）；alembic 0003 实跑 upgrade 0002→0003 落库 MySQL（pending_deltas 表 + badcases.trace_json）；TDD 2 项 ORM 冒烟通过 |
+| 07-02 | generate 验证 | logging_config/pipeline/client/repository/ingest_service | 修 5 真 bug（编码 ✅emoji/JSON trailing comma/block_code 去下划线匹配/version 自增）；验证日志 docs/verification-log.md 7 条 |
+| 07-02 | generate 异步+进度 | api/routers/generate.py + nodes/orchestrator.py | POST /generate 异步（run_id）+ GET /runs/{id}/status（节点进度）+ /result（BOM）；orchestrator commit_after_each 节点级 commit 实时见节点 |
+| 07-02 | 前端 demo | frontend/index.html + src/App.vue + main.js | Vue3 三环节（设计/进度/输出），Vite 代理联调，轮询健壮性（超时/连续失败/clipboard 降级） |
+| 07-02 | generate 升级 T1-T6 | schemas/bom.py + gen_stage1.txt + _generate_logic + rule_check + verify.txt + _verify_logic + assemble.txt + _prompt_logic + gen_stage2.txt + _profile_logic | BOM 精细化（scene/logic/poison_words/reasoning_chain/scene_judgments/negative_examples）；gen_stage1 产精细规则+思维链+判例（few-shot 外置 _fewshot_deposit_cap.txt）；RuleCheck 读 poison_words 校验误杀+scene 分桶；SelfCheck 走 reasoning_chain 抓方向反/主体错；assemble 展示精细字段（示例不进）；回修链重 assemble+种子带新字段。8 task TDD，专家 agent 审视修正 M1-M10 |
+| 07-02 | 文档+gitignore | docs/superpowers/plans/2026-07-02-generate-bom-upgrade.md + verification-log + .gitignore | generate 升级计划（8 task+M1-M10）+ 验证日志（7 条）+ test/ 不入库（真实合同数据铁律5） |
 
 ### 阻塞
 - 暂无
