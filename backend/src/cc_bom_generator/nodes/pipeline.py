@@ -14,7 +14,10 @@ from ..schemas.bom import BOM
 from ..schemas.cleaned_test_set import CleanedTestSet, FullPrompt
 from ..schemas.diagnosis import Verification
 from ..schemas.generation_state import GenerationState
+from ..logging_config import get_logger
 from .orchestrator import create_default_orchestrator
+
+log = get_logger("pipeline")
 
 
 def generate_bom(
@@ -51,9 +54,9 @@ def generate_bom(
     full_prompt = state.full_prompt
     verification = state.verification
 
-    print(f"\n  ✅ 生成完成：{bom.clause}")
+    log.info(f"生成完成: {bom.clause}")
     if verification:
-        print(f"  自检结论: {verification.summary[:80]}")
-    print(f"  提示词长度: {len(full_prompt.prompt_text)} 字")
+        log.info(f"自检结论: {verification.summary[:80]}")
+    log.info(f"提示词长度: {len(full_prompt.prompt_text)} 字")
 
     return bom, full_prompt, verification

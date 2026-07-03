@@ -166,6 +166,15 @@ class PipelineRepository:
         created_by: str = "",
         previous_bom_id: Optional[int] = None,
     ) -> int:
+        # version 自增：同 block_code 再 generate 时版本递增，避免 (block_code, version) 唯一约束冲突
+        from sqlalchemy import func
+        max_ver = (
+            self.session.query(func.max(BomVersion.version))
+            .filter(BomVersion.block_code == block_code)
+            .scalar()
+        )
+        version = (max_ver or 0) + 1
+
         bom = BomVersion(
             block_code=block_code,
             version=version,

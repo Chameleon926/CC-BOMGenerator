@@ -72,10 +72,12 @@ def parse_excel_to_cleaned(
 
 
 def find_col(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
-    """自适应列名查找（去空格、大小写无关）。"""
-    col_map = {str(c).replace(" ", "").lower(): c for c in df.columns}
+    """自适应列名查找（去空格+去下划线+大小写无关：'Block Code' / 'block_code' / 'blockcode' 都匹配）。"""
+    def _norm(s) -> str:
+        return str(s).replace(" ", "").replace("_", "").replace("-", "").lower()
+    col_map = {_norm(c): c for c in df.columns}
     for name in candidates:
-        key = name.replace(" ", "").lower()
+        key = _norm(name)
         if key in col_map:
             return col_map[key]
     return None

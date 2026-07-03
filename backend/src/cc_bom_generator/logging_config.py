@@ -28,6 +28,13 @@ def _setup():
     root = logging.getLogger()
     root.setLevel(logging.INFO)  # 只用 INFO 和 ERROR，不开 DEBUG
 
+    # Windows 控制台默认 GBK（cp936），emoji / 特殊字符会编码失败（如 pipeline 的 ✅）→ reconfigure utf-8
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass  # 某些环境（如重定向到文件）不支持 reconfigure，忽略
+
     # 控制台输出
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(logging.INFO)

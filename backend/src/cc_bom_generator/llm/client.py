@@ -17,6 +17,10 @@ from typing import Any
 
 import yaml
 
+from ..logging_config import get_logger
+
+log = get_logger("llm.client")
+
 # 项目根目录（backend/ 的上一级 = CC-BOMGenerator/）
 # client.py 在 backend/src/cc_bom_generator/llm/client.py，往上 5 级
 _PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -103,6 +107,7 @@ def call_json(
                     {"role": "user", "content": "上一次输出无法解析为 JSON。请只返回一个合法 JSON 对象，不要任何额外文字。"},
                 ]
             else:
+                log.error(f"LLM 输出解析失败，原始输出（完整，长度 {len(text)}）:\n{text}")
                 raise ValueError(f"大模型输出无法解析为 JSON（重试 {max_retries} 次后仍失败）:\n{text[:500]}")
 
 
@@ -165,10 +170,12 @@ def _call_anthropic(messages: list[dict], temperature: float) -> str:
 # ==================== 工具 ====================
 
 def _parse_json(text: str) -> dict:
-    """容错 JSON 解析"""
+    """容错 JSON 解析（markdown 包裹 / 前后解释文字 / trailing comma）。"""
     s = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
     start = s.find("{")
     end = s.rfind("}")
     if start >= 0 and end > start:
         s = s[start : end + 1]
+    # 去 trailing comma（LLM 常见错误：{"a": 1,} 或 [1, 2,]）
+    s = re.sub(r",\s*([}\]])", r"\1", s)
     return json.loads(s)
