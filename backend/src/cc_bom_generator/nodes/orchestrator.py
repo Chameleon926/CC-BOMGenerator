@@ -34,13 +34,17 @@ class GenerationOrchestrator:
         self.skills = skills
         self.max_retries = max_retries
         self.retry_skills = retry_skills or self._default_retry_skills()
+        self._commit_after_each = False
 
-    def run(self, state: GenerationState, repo: "PipelineRepository", run_id: int | None = None) -> GenerationState:
+    def run(self, state: GenerationState, repo: "PipelineRepository", run_id: int | None = None, commit_after_each: bool = False) -> GenerationState:
         """执行完整管线，通过 repo 记录到数据库（事务由调用层控制）。
 
         run_id: 异步场景由调用方先 start_pipeline_run 拿到 run_id 并返回给前端，
                 再起线程调本方法（传入 run_id）跑剩余节点；不传则内部创建。
+        commit_after_each: HTTP 异步路径设 True，每个节点写库后立即 commit，
+                让 /runs/{id}/status 实时看到节点进度（牺牲 run 级事务原子性；generate 半残可接受，有 run_status 标记）。
         """
+        self._commit_after_each = commit_after_each
         cleaned = state.cleaned
         log.info(f"管线启动: 条款={cleaned.clause} ({cleaned.block_code}), 正例数={len(cleaned.positive_values)}")
 
@@ -68,6 +72,8 @@ class GenerationOrchestrator:
                         run_id, status="running",
                         output_bom_json=state.bom.model_dump(mode="json"),
                     )
+                    if self._commit_after_each:
+                        repo.session.commit()
 
             # ---- 回修检查 ----
             if self._needs_retry(state):
@@ -89,6 +95,8 @@ class GenerationOrchestrator:
                 output_prompt_text=final_prompt,
                 error_message=error_msg,
             )
+            if self._commit_after_each:
+                repo.session.commit()
 
         # ---- 写库：保存 BOM 版本 ----
         if state.bom and state.full_prompt:
@@ -102,6 +110,8 @@ class GenerationOrchestrator:
                 pipeline_run_id=run_id,
             )
             state._bom_version_id = bom_id
+            if self._commit_after_each:
+                repo.session.commit()
 
         log.info(f"管线完成: 条款={cleaned.clause}, status={final_status}")
         return state
@@ -148,6 +158,8 @@ class GenerationOrchestrator:
                 success=success,
                 duration_ms=duration_ms,
             )
+            if self._commit_after_each:
+                repo.session.commit()  # 节点级 commit，让 /status 实时可见
 
         return state
 
