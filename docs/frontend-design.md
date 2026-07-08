@@ -531,7 +531,8 @@ const SKILL_NAMES = {
 |---|---|---|---|---|
 | 2026-07-08 | 初版 | 全文 | ui-ux-pro-max 审视 + 沉淀：定 3 层 IA / Data-Dense Dashboard 设计系统 / 后端契约（含 4 缺口）/ 死代码清单 / 路线图 / 变更协议 | `43e28b6` |
 | 2026-07-08 | 后端-B 方案 | §6.1/§6.2/§5.3/§10.2 | 补原型 4 缺口：`GET /runs`(progress%) + `POST /stop` + finish-cancelled 守护(repository 列查询) + selected_examples 全链路带 doc_id(新增 PositiveExample 行契约，真实数据 PASS)；run_result 放宽（失败/取消也返）；资深测试 24 项 pytest 全绿、并发推演通过。**契约变更需通知杨力（铁律9）** | `43e28b6` |
-| 2026-07-08 | 前端施工补遗 | §3.2/§5.2/§13 | 资深前端 agent 评审后修施工缺口：§3.2 status 字段名(run_status→`status`)、§5.2 删无端点的重试按钮+block_code 来源(route.query)+轮询条件；新增 §13 施工补遗（跨页状态约定/字段映射/组件 props 边界/迁移顺序/router mode/错误边界等） | （待 commit） |
+| 2026-07-08 | 前端施工补遗 | §3.2/§5.2/§13 | 资深前端 agent 评审后修施工缺口：§3.2 status 字段名(run_status→`status`)、§5.2 删无端点的重试按钮+block_code 来源(route.query)+轮询条件；新增 §13 施工补遗（跨页状态约定/字段映射/组件 props 边界/迁移顺序/router mode/错误边界等） | `d4e14b4` |
+| 2026-07-08 | 前端实现(B-1/B-2) | §4/§5/§13.5 | vue-router 3层IA骨架(4路由)+App纯Shell+useRunPoll composable；4 页真功能(LibraryView/RunsView/RunDetailView/ConfigView)+RunProgress/BomPreview 组件；删死代码 GeneratePanel/ConfigPanel；接线 api；vite build 通过 | （待 commit） |
 
 ---
 

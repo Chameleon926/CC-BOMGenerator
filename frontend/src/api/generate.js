@@ -15,9 +15,15 @@ export const generateApi = {
     return api.post('/generate', form)
   },
 
-  /** 查询执行进度 */
+  /** 任务列表（可按 block_code 筛选，含 progress%） */
+  list: (block_code = '') => api.get('/runs', { params: block_code ? { block_code } : {} }),
+
+  /** 查询执行进度（节点级） */
   status: (run_id) => api.get(`/runs/${run_id}/status`),
 
-  /** 获取生成结果（BOM + 提示词） */
+  /** 获取生成结果（BOM + 提示词 + 选取正例；失败/取消也返已产出部分） */
   result: (run_id) => api.get(`/runs/${run_id}/result`),
+
+  /** 停止任务（标 cancelled，当前节点跑完后生效） */
+  stop: (run_id) => api.post(`/runs/${run_id}/stop`),
 }

@@ -16,9 +16,9 @@
   - **generate BOM 精细化升级 T1-T6**（8 task，对标旧平台押金/封顶 prompt）：BOM 加 scene/logic/poison_words/reasoning_chain/scene_judgments/negative_examples；gen_stage1 产精细规则（few-shot 外置）；RuleCheck 读 poison_words+scene 分桶；SelfCheck 走 reasoning_chain 抓方向反/主体错；assemble 展示精细字段（示例不进）；回修链重 assemble+种子带新字段；专家 agent 审视修正 M1-M10
   - 进度反馈修复：orchestrator commit_after_each（节点级 commit），/status 实时见节点
 - **下一步**：
-  - **前端（以 `docs/frontend-design.md` §10 路线图为单一事实源）**：P0 vue-router 路由化（4 路由）+ 删死代码（旧 GeneratePanel.vue/ConfigPanel.vue）+ 接线 4 个 api 模块；P0 后端 commit `GET /runs` + `POST /runs/{id}/stop`；P1 任务列表/详情页 + 后端补 selected_examples
+  - **后端 B 方案已 commit + push**（`43e28b6` = origin；含 GET/runs + stop + finish守护 + selected_examples）。⚠️ **PR 待杨力 review 契约变更**（CleanedTestSet 加 PositiveExample + positive_examples；ingest 改解析全列）—— 需通知杨力
+  - **前端 3 层 IA 已实现（B-0/B-1/B-2 本地 commit，待 push + runtime 联调）**：router+views+composables 骨架 + 4 页真功能（LibraryView/RunsView/RunDetailView/ConfigView）+ 删死代码；vite build 通过。下一步：push + 启后端联调（导入→生成→详情走查）+ a11y 打磨 + api 拦截器轮询降噪
   - **后端**：技术文档同步（第4章 generate 算法 + 第8章 BOM 输出对照，反映精细 BOM）+ 回归案例（押金/封顶业务正确性）+ 调优闭环 PR2（logic+prompt）
-  - **✅ 4 个后端缺口 B 方案已补**（详见 `frontend-design.md` §6.2，待 commit）：① `GET /runs` + `POST /runs/{id}/stop` 已写 ② **finish-cancelled 守护已修**（repository 列查询绕 identity map，并发推演 a/b/c/d 通过）③ `selected_examples` 全链路带 doc_id（新增 PositiveExample 行契约，真实数据验证 PASS；run_result 放宽失败/取消也返；state.positive_examples 改名 selected_values 避免同名异类型）④ stop 不真中断 Thread（已知限制，UX 文案待定）。**资深测试 24 项 pytest 全绿，PM 条件通过。契约变更需通知杨力（铁律9）**
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
@@ -58,6 +58,9 @@
 | 07-06 | generate 文件可选 | api/routers/generate.py（generate 端点） | file 改 File(None) 可选；不传时用 backend/data/uploads/latest.xlsx（刷新页面也能 generate，不依赖前端 File 对象） |
 | 07-08 | 前端设计文档 | docs/frontend-design.md | ui-ux-pro-max 审视 + 沉淀**前端单一事实源**：3 层 IA（条款库→任务列表→详情）+ Data-Dense Dashboard 设计系统 + 后端契约表（含 4 缺口）+ 死代码清单（2 旧组件待删 / 4 api 模块待接线）+ P0-P2 路线图 + 变更协议铁律。同步更新 progress.md 当前任务/下一步 |
 | 07-08 | 后端-B 方案 | schemas/cleaned_test_set.py + generation_state.py + services/ingest_service.py + nodes/skills/(_keyword_logic/example_retrieve/rule_check/self_check/profile_build_skill) + nodes/orchestrator.py + db/repository.py + api/routers/generate.py + tests/(test_b_plan.py + test_finish_cancelled_guard.py) | 补原型 4 缺口：PositiveExample 行契约 + selected_examples 全链路带 doc_id（真实数据验证 PASS，run_result 放宽失败/取消也返）+ GET /runs(progress%) + POST /runs/{id}/stop + finish-cancelled 守护（repository 列查询绕 identity map，并发推演通过）；state.positive_examples 改名 selected_values；资深测试 24 项 pytest 全绿。**契约变更需通知杨力（铁律9）** |
+| 07-08 | 前端设计评审+补遗(B-0) | docs/frontend-design.md | 资深前端 agent 评审施工图，修 4 阻塞（§3.2 status 字段名 run_status→`status` / §5.2 删无端点重试 / block_code 来源 route.query / 轮询条件）+ 新增 §13 施工补遗（跨页状态约定/字段映射/组件 props 边界/迁移顺序依赖图/router mode/错误边界/api 模块更正） |
+| 07-08 | 前端 router 骨架(B-1) | frontend/src/(router/views/composables/constants)+main.js+App.vue | vue-router 3层IA骨架(4路由 createWebHistory)+App纯Shell(sidebar RouterLink+topbar+RouterView)+composables/useRunPoll(跨页 pendingRuns 单例+单run轮询 onUnmounted 清理)+constants/skill(SKILL_NAMES 去重)；vite build 通过 |
+| 07-08 | 前端 views 实现(B-2) | frontend/src/(views×4 + components/RunProgress+BomPreview + api/generate.js) | LibraryView(导入scan/新增/删除popconfirm/搜索/生成→任务列表) + RunsView(el-progress+状态tag+停止popconfirm/详情+轮询+合并pendingRuns) + RunDetailView(节点进度+选取数据selected_examples+BOM折叠+提示词复制+useRunPoll) + ConfigView；删死代码 GeneratePanel/ConfigPanel；api/generate 补 list+stop；vite build 通过 |
 
 ### 阻塞
 - 暂无
