@@ -15,11 +15,11 @@ export const generateApi = {
     return api.post('/generate', form)
   },
 
-  /** 任务列表（可按 block_code 筛选，含 progress%） */
-  list: (block_code = '') => api.get('/runs', { params: block_code ? { block_code } : {} }),
+  /** 任务列表（可按 block_code 筛选，含 progress%）。opts 透传 axios config（轮询传 {skipToast:true}） */
+  list: (block_code = '', opts = {}) => api.get('/runs', { params: block_code ? { block_code } : {}, ...opts }),
 
-  /** 查询执行进度（节点级） */
-  status: (run_id) => api.get(`/runs/${run_id}/status`),
+  /** 查询执行进度（节点级）。opts 透传 axios config（轮询传 {skipToast:true}） */
+  status: (run_id, opts = {}) => api.get(`/runs/${run_id}/status`, opts),
 
   /** 获取生成结果（BOM + 提示词 + 选取正例；失败/取消也返已产出部分） */
   result: (run_id) => api.get(`/runs/${run_id}/result`),

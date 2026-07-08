@@ -37,7 +37,7 @@ export function useRunPoll(onUpdate, { interval = 2000, timeoutMs = 5 * 60 * 100
     timer = setInterval(async () => {
       if (Date.now() - startedAt > timeoutMs) { stop(); onUpdate({ phase: 'error', error: '超时' }); return }
       try {
-        const data = await generateApi.status(run_id)
+        const data = await generateApi.status(run_id, { skipToast: true })
         fails = 0
         onUpdate({ phase: 'running', statusData: data })
         if (TERMINAL.includes(data.status)) {

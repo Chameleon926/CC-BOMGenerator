@@ -11,8 +11,12 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response.data, // 直接返回 data（不用每次 res.data）
   (error) => {
+    // 轮询类调用传 { skipToast: true } 抑制 toast（后台瞬断时不刷屏，由调用方按失败次数处理）
+    if (error.config?.skipToast) {
+      return Promise.reject(error)
+    }
     const msg = error.response?.data?.detail || error.message || '请求失败'
-    // 403（LLM 认证）等业务错误，弹消息
+    // 403（LLM 认证）等业务错误弹消息；404 静默（由调用方渲染空态）
     if (error.response?.status !== 404) {
       ElMessage.error(typeof msg === 'string' ? msg : JSON.stringify(msg))
     }

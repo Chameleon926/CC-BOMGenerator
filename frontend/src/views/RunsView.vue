@@ -41,7 +41,7 @@ const startPoll = () => {
   if (pollTimer) return
   pollTimer = setInterval(async () => {
     if (!anyRunning.value) { clearInterval(pollTimer); pollTimer = null; return }
-    try { runs.value = (await generateApi.list(block_code.value)).runs || [] } catch {}
+    try { runs.value = (await generateApi.list(block_code.value, { skipToast: true })).runs || [] } catch {}
   }, 2000)
 }
 
