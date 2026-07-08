@@ -48,6 +48,8 @@ secrets/
 data/raw/
 data/sensitive/
 data/private/
+# 后端运行时上传的测试集（scan 写入 backend/data/uploads/latest.xlsx，含真实合同数据，铁律5）
+backend/data/
 # 如需共享脱敏后的样例，放在 data/samples/（默认不忽略）
 
 # ===== PoC 生成物（每次运行的输出，不入库）=====
