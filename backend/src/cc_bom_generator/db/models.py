@@ -40,6 +40,9 @@ class Clause(Base):
     domain = Column(String(32), nullable=False, server_default="")
     current_version = Column(Integer, server_default="0")
     coverage_threshold = Column(Float, server_default="0.8", comment="覆盖率阈值，默认80%")
+    positive_count = Column(Integer, server_default="0", comment="用例数（scan 时写入）")
+    source_file = Column(String(256), server_default="", comment="来源测试集文件名")
+    imported_at = Column(DateTime, server_default=func.now(), comment="最近导入时间")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

@@ -81,3 +81,42 @@ def find_col(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
         if key in col_map:
             return col_map[key]
     return None
+
+
+def scan_clauses(path: Path) -> list[dict]:
+    """扫描测试集所有 sheet，提取条款列表（按 block_code 去重）。
+
+    支持 1 个或多个 sheet，每 sheet 1 个或多个条款。
+    返回 [{block_code, block_name, positive_count, sheets: [sheet名]}]，供前端渲染左侧条款列表。
+    """
+    if path.suffix.lower() not in (".xlsx", ".xls"):
+        sheets = {"(csv)": pd.read_csv(path).fillna("")}
+    else:
+        xls = pd.ExcelFile(path)
+        sheets = {s: pd.read_excel(xls, sheet_name=s).fillna("") for s in xls.sheet_names}
+
+    clauses: dict[str, dict] = {}
+    for sheet_name, df in sheets.items():
+        bc_col = find_col(df, ["block_code", "语义块编码", "块/项编码", "条款编码"])
+        bn_col = find_col(df, ["block_name", "语义块名称", "块/项名称", "条款名称"])
+        expected_col = find_col(df, ["expected_value", "期望值", "期望结果", "期望"])
+        if not bc_col:
+            continue  # 该 sheet 无 block_code 列，跳过
+        for _, row in df.iterrows():
+            bc = str(row[bc_col]).strip()
+            if not bc:
+                continue
+            bn = str(row[bn_col]).strip() if bn_col else ""
+            has_value = bool(expected_col and str(row[expected_col]).strip())
+            if bc not in clauses:
+                clauses[bc] = {
+                    "block_code": bc, "block_name": bn,
+                    "positive_count": 0, "sheets": set(),
+                }
+            if has_value:
+                clauses[bc]["positive_count"] += 1
+            clauses[bc]["sheets"].add(sheet_name)
+            if not clauses[bc]["block_name"] and bn:
+                clauses[bc]["block_name"] = bn
+    # set → sorted list（JSON 可序列化）
+    return [{**c, "sheets": sorted(c["sheets"])} for c in clauses.values()]
