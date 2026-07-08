@@ -15,7 +15,10 @@
   - 前端 demo：Vue3 三环节（设计/进度/输出），Vite 代理联调通，多 agent 验证
   - **generate BOM 精细化升级 T1-T6**（8 task，对标旧平台押金/封顶 prompt）：BOM 加 scene/logic/poison_words/reasoning_chain/scene_judgments/negative_examples；gen_stage1 产精细规则（few-shot 外置）；RuleCheck 读 poison_words+scene 分桶；SelfCheck 走 reasoning_chain 抓方向反/主体错；assemble 展示精细字段（示例不进）；回修链重 assemble+种子带新字段；专家 agent 审视修正 M1-M10
   - 进度反馈修复：orchestrator commit_after_each（节点级 commit），/status 实时见节点
-- **下一步**：技术文档同步（第4章 generate 算法 + 第8章 BOM 输出对照，反映精细 BOM）+ 回归案例（押金/封顶业务正确性）+ 调优闭环 PR2（logic+prompt）
+- **下一步**：
+  - **前端（以 `docs/frontend-design.md` §10 路线图为单一事实源）**：P0 vue-router 路由化（4 路由）+ 删死代码（旧 GeneratePanel.vue/ConfigPanel.vue）+ 接线 4 个 api 模块；P0 后端 commit `GET /runs` + `POST /runs/{id}/stop`；P1 任务列表/详情页 + 后端补 selected_examples
+  - **后端**：技术文档同步（第4章 generate 算法 + 第8章 BOM 输出对照，反映精细 BOM）+ 回归案例（押金/封顶业务正确性）+ 调优闭环 PR2（logic+prompt）
+  - **✅ 4 个后端缺口 B 方案已补**（详见 `frontend-design.md` §6.2，待 commit）：① `GET /runs` + `POST /runs/{id}/stop` 已写 ② **finish-cancelled 守护已修**（repository 列查询绕 identity map，并发推演 a/b/c/d 通过）③ `selected_examples` 全链路带 doc_id（新增 PositiveExample 行契约，真实数据验证 PASS；run_result 放宽失败/取消也返；state.positive_examples 改名 selected_values 避免同名异类型）④ stop 不真中断 Thread（已知限制，UX 文案待定）。**资深测试 24 项 pytest 全绿，PM 条件通过。契约变更需通知杨力（铁律9）**
 
 ### 已完成
 | 日期 | 模块 | 文件 | 说明 |
@@ -50,6 +53,11 @@
 | 07-02 | 前端 demo | frontend/index.html + src/App.vue + main.js | Vue3 三环节（设计/进度/输出），Vite 代理联调，轮询健壮性（超时/连续失败/clipboard 降级） |
 | 07-02 | generate 升级 T1-T6 | schemas/bom.py + gen_stage1.txt + _generate_logic + rule_check + verify.txt + _verify_logic + assemble.txt + _prompt_logic + gen_stage2.txt + _profile_logic | BOM 精细化（scene/logic/poison_words/reasoning_chain/scene_judgments/negative_examples）；gen_stage1 产精细规则+思维链+判例（few-shot 外置 _fewshot_deposit_cap.txt）；RuleCheck 读 poison_words 校验误杀+scene 分桶；SelfCheck 走 reasoning_chain 抓方向反/主体错；assemble 展示精细字段（示例不进）；回修链重 assemble+种子带新字段。8 task TDD，专家 agent 审视修正 M1-M10 |
 | 07-02 | 文档+gitignore | docs/superpowers/plans/2026-07-02-generate-bom-upgrade.md + verification-log + .gitignore | generate 升级计划（8 task+M1-M10）+ 验证日志（7 条）+ test/ 不入库（真实合同数据铁律5） |
+| 07-06 | 前端企业级重构 | frontend/（App.vue + main.js + style.css + tailwind.config.js） | 装 Element Plus + Tailwind CSS；App.vue 重写为蓝白企业级分屏工作台（sidebar 240 + topbar 60 + 左数据预处理 el-upload/el-table + 右生成结果 el-descriptions BOM + 提示词代码块）；icon 全局注册（main.js）；scan/generate/clauses/config API 联调 |
+| 07-06 | scan 持久化 | api/routers/generate.py（scan 端点）+ ingest_service.scan_clauses | scan 时存 xlsx 到 backend/data/uploads/latest.xlsx + upsert clauses 表；新增 GET /api/clauses（从 latest.xlsx scan，含 positive_count+sheets） |
+| 07-06 | generate 文件可选 | api/routers/generate.py（generate 端点） | file 改 File(None) 可选；不传时用 backend/data/uploads/latest.xlsx（刷新页面也能 generate，不依赖前端 File 对象） |
+| 07-08 | 前端设计文档 | docs/frontend-design.md | ui-ux-pro-max 审视 + 沉淀**前端单一事实源**：3 层 IA（条款库→任务列表→详情）+ Data-Dense Dashboard 设计系统 + 后端契约表（含 4 缺口）+ 死代码清单（2 旧组件待删 / 4 api 模块待接线）+ P0-P2 路线图 + 变更协议铁律。同步更新 progress.md 当前任务/下一步 |
+| 07-08 | 后端-B 方案 | schemas/cleaned_test_set.py + generation_state.py + services/ingest_service.py + nodes/skills/(_keyword_logic/example_retrieve/rule_check/self_check/profile_build_skill) + nodes/orchestrator.py + db/repository.py + api/routers/generate.py + tests/(test_b_plan.py + test_finish_cancelled_guard.py) | 补原型 4 缺口：PositiveExample 行契约 + selected_examples 全链路带 doc_id（真实数据验证 PASS，run_result 放宽失败/取消也返）+ GET /runs(progress%) + POST /runs/{id}/stop + finish-cancelled 守护（repository 列查询绕 identity map，并发推演通过）；state.positive_examples 改名 selected_values；资深测试 24 项 pytest 全绿。**契约变更需通知杨力（铁律9）** |
 
 ### 阻塞
 - 暂无
