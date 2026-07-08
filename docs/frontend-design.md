@@ -108,8 +108,10 @@
 | 次要 | `text-muted` | `#64748B`（slate-500） | 辅助文字（≥4.5:1） |
 
 > **任务状态 → 颜色映射（全局统一，不可散落）：**
+>
+> ⚠️ **API 字段名是 `status`**（`GET /runs` 与 `GET /runs/{id}/status` 都返 `status`）。`run_status` 是**数据库列名**，前端代码一律用 `run.status`，别用 run_status。下表"取值"列即 `run.status` 的可能值。
 
-| 状态 | run_status | el-tag type | 含义 |
+| 状态 | `run.status` 取值 | el-tag type | 含义 |
 |---|---|---|---|
 | 排队中 | `queued` | `info` | 未开始 |
 | 执行中 | `running` | `warning` | 后台线程跑节点 |
@@ -254,21 +256,25 @@ frontend/src/
 │ 交付   | ████░░ 5/7    | 执行中 | a.xlsx  | 17:10    |[详情][停止]│
 │ 交付   | ██████ 7/7    | ✓成功  | a.xlsx  | 17:05    |[详情]     │
 │ 收入   | ░░░░░░ 0/7    | 排队中 | a.xlsx  | 17:12    |[详情][停止]│
-│ 交付   | ████░░ 5/7    | ✗失败  | a.xlsx  | 17:00    |[详情][重试]│
+│ 交付   | ████░░ 5/7    | ✗失败  | a.xlsx  | 17:00    |[详情]     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 | 元素 | 组件 | 数据源 | 说明 |
 |---|---|---|---|
-| 进度 | `el-progress :percentage` | `done_nodes / 7 * 100` | 7 个 Skill 节点 |
-| 状态 | `el-tag` | `run.run_status` | 见 §3.2 状态映射 |
-| 停止 | `el-button danger` + `el-popconfirm` | `POST /runs/{id}/stop` | 仅 running 时显示 |
+| 进度 | `el-progress :percentage :text-inside` | `run.progress`（后端已算好 %） | 后端 `GET /runs` 直接返 progress/done_nodes/total_steps，**前端别重算** |
+| 状态 | `el-tag` | `run.status` | 见 §3.2 状态映射（字段名 `status`，不是 run_status） |
+| 停止 | `el-button danger` + `el-popconfirm` | `POST /runs/{id}/stop` | 仅 `run.status==='running'` 时显示 |
 | 详情 | `el-button` | 路由 `/runs/:id` | — |
-| 自动刷新 | 轮询 `GET /runs?block_code=X` | 2s | 有 running 任务时轮询，全终态停 |
+| 自动刷新 | 轮询 `GET /runs` | 2s | `route.query.block_code` 透传；**任一 run.status==='running' 时轮询，全终态停**；onUnmounted 必清（§6.3） |
+
+**路由参数：** `block_code` 从 `route.query.block_code` 读（条款库点「生成」后 `router.push({path:'/runs', query:{block_code:bc}})`），透传给 `GET /runs?block_code=X`；无 query 则列全部。
+
+**失败 run 无「重试」按钮**（后端无 retry 端点）；重跑 = 回条款库点「生成」新建 run。
 
 **UX 准则：** `loading-buttons`(P2) `confirmation-dialogs`(P8) `nav-state-active`(P9) `number-tabular`(P6)
 
-> ⚠️ 依赖后端 `GET /runs`（**已写未 commit**，见 §6）+ `POST /runs/{id}/stop`（**已写未 commit，但有 finish 覆盖 bug**，见 §6）。
+> ✅ 后端 `GET /runs` + `POST /runs/{id}/stop` 已就绪（B 方案 commit `aabcb02`，含 finish-cancelled 守护，见 §6）。
 
 ### 5.3 页面 C — 任务详情（`/runs/:id`，第三级）
 
@@ -523,5 +529,77 @@ const SKILL_NAMES = {
 
 | 日期 | 类型 | 章节 | 说明 | commit |
 |---|---|---|---|---|
-| 2026-07-08 | 初版 | 全文 | ui-ux-pro-max 审视 + 沉淀：定 3 层 IA / Data-Dense Dashboard 设计系统 / 后端契约（含 4 缺口）/ 死代码清单 / 路线图 / 变更协议 | （待 commit） |
-| 2026-07-08 | 后端-B 方案 | §6.1/§6.2/§5.3/§10.2 | 补原型 4 缺口：`GET /runs`(progress%) + `POST /stop` + finish-cancelled 守护(repository 列查询) + selected_examples 全链路带 doc_id(新增 PositiveExample 行契约，真实数据 PASS)；run_result 放宽（失败/取消也返）；资深测试 24 项 pytest 全绿、并发推演通过。**契约变更需通知杨力（铁律9）** | （待 commit） |
+| 2026-07-08 | 初版 | 全文 | ui-ux-pro-max 审视 + 沉淀：定 3 层 IA / Data-Dense Dashboard 设计系统 / 后端契约（含 4 缺口）/ 死代码清单 / 路线图 / 变更协议 | `43e28b6` |
+| 2026-07-08 | 后端-B 方案 | §6.1/§6.2/§5.3/§10.2 | 补原型 4 缺口：`GET /runs`(progress%) + `POST /stop` + finish-cancelled 守护(repository 列查询) + selected_examples 全链路带 doc_id(新增 PositiveExample 行契约，真实数据 PASS)；run_result 放宽（失败/取消也返）；资深测试 24 项 pytest 全绿、并发推演通过。**契约变更需通知杨力（铁律9）** | `43e28b6` |
+| 2026-07-08 | 前端施工补遗 | §3.2/§5.2/§13 | 资深前端 agent 评审后修施工缺口：§3.2 status 字段名(run_status→`status`)、§5.2 删无端点的重试按钮+block_code 来源(route.query)+轮询条件；新增 §13 施工补遗（跨页状态约定/字段映射/组件 props 边界/迁移顺序/router mode/错误边界等） | （待 commit） |
+
+---
+
+## 13. 施工补遗（按资深前端评审，2026-07-08）
+
+> 评审结论：设计层 OK，施工层缺字段级/组件级细节。本节补齐至 build-ready。
+
+### 13.1 跨页状态传递约定（不引入 Pinia 的替代方案，**阻塞项**）
+
+| 状态类型 | 方案 | 说明 |
+|---|---|---|
+| 路由参数（block_code / run_id） | `route.query` / `route.params` | 条款库→`/runs?block_code=X`；列表→`/runs/:id`。URL 即状态，可分享/刷新 |
+| 会话级刚创建未落库的 run | `composables/useRunPoll.js` **模块级单例 ref** | 条款库点生成→POST /generate 拿 run_id→立即写进单例→跳 `/runs`；RunsView onMounted 读单例 + 拉 `GET /runs` 合并，避免竞态（列表还没该 run） |
+| 列表/详情各自的轮询 | 组件内 ref + `onUnmounted` 清理 | **轮询发生点**：RunsView（列表轮询）+ RunDetailView（详情轮询），**两处都要 onUnmounted 清 pollTimer** |
+| 条款选中态 | 不跨页（各页自管） | LibraryView 本地 selectedClause；RunsView 用 route.query.block_code 定位 |
+
+### 13.2 字段映射表（前端列 ↔ 后端字段）
+
+| 页 | 前端列/展示 | 后端字段 | 端点 |
+|---|---|---|---|
+| A 条款库 | 条款名称/编码/用例/版本/来源 | `block_name`/`block_code`/`positive_count`/`current_version`/`source_file` | `GET /clauses` |
+| B 任务列表 | 进度/状态/测试集/创建/耗时 | `progress`/`status`/`source_file`(从clause)/`started_at`/`duration_ms` | `GET /runs` |
+| C 任务详情 | run_id/状态/耗时/nodes/选取/BOM | `run_id`/`status`/`duration_ms`/`nodes[]`/`selected_examples[]`/`bom`+`full_prompt` | `/status` + `/result` |
+
+> `GET /runs` 不直接返测试集名；若要展示，RunsView 用 `run.block_code` 反查 clause 列表拿 `source_file`，或后端补字段（P2）。
+
+### 13.3 复用组件 props/emits 边界（§4 组件为**新建**，非保留）
+
+| 组件 | props | emits | 形态 |
+|---|---|---|---|
+| `ClauseTable.vue`【新建】 | `clauses`, `loading`, `selected`(bc) | `select`, `generate`(bc), `delete`(bc) | 纯展示+事件，**不自带 fetch**（父组件拉数据传入） |
+| `RunProgress.vue`【新建】 | `nodes[]`, `mode: 'bar'\|'list'` | — | `bar`：`el-progress :percentage`（列表用）；`list`：节点清单 ✓/✗/○（详情用）。**双形态靠 mode prop 切** |
+| `BomPreview.vue`【新建】 | `bom` | — | `el-collapse` 7 块；定义/拦截默认展开，其余收起 |
+
+### 13.4 App.vue（337 行）逻辑搬迁归属
+
+| 现有逻辑 | 迁到 |
+|---|---|
+| `activeMenu`/menuItems | 删（router-link-active 接管 sidebar 高亮） |
+| 上传/扫描/clauses/搜索 | `LibraryView.vue` + `clausesApi` |
+| `runs`/startGenerate/startPoll/stopPoll | `composables/useRunPoll.js`（**跨页单例**，含 onUnmounted；参考 GeneratePanel.vue:81 的正确清理） |
+| currentRun/Bom/Prompt computed | `RunDetailView.vue` 本地 |
+| `SKILL_NAMES` | `constants/skill.js`（全局唯一） |
+| `copyPrompt` | `composables/useClipboard.js` 或详情页本地 |
+
+### 13.5 迁移顺序依赖图（**严格按序**，避免断网/丢逻辑）
+
+```
+1. 建 router/index.js + views/ 4 空壳 + App.vue 改纯 Shell(router-view)  ← 空壳能跑
+2. 抽 composables/useRunPoll.js（含 onUnmounted，参考 GeneratePanel:81）+ constants/skill.js
+3. views 内接线 api/ 4 模块（已可 import，见 §13.6）实现 3 页 + ConfigView
+4. 全绿验证（联调后端）
+5. 删死代码 GeneratePanel.vue / ConfigPanel.vue（此时其有用逻辑已抽进 composable）
+```
+> ⚠️ **不要先删死代码再接线**——GeneratePanel 的 onUnmounted 清理是正确逻辑，必须先抽进 useRunPoll 再删，否则回归 bug（§9.1#2）。
+
+### 13.6 api/ 模块状态更正（§9.3 过保守）
+
+`src/api/`（index/generate/config/clauses 4 模块）**代码完整、可直接 import**（`clausesApi` 含全 CRUD、`generateApi` 含 start/status/result、`configApi` 完整、`index.js` 响应拦截器已统一处理错误+404 静默）。§9.3"未接线"应理解为"App.vue 单文件没引用"，**路由化重构时直接 import 使用即可**，无需重写。
+
+### 13.7 其他施工决策
+
+- **router mode**：`createWebHistory`（生产 nginx 需 `try_files $uri $uri/ /index.html` 兜底，否则刷新 `/runs/1` 404）；若 nginx 暂未配，开发期可用 `createWebHash` 过渡。
+- **错误边界**：详情页 `/runs/:id` 不存在→后端 404→前端 `el-empty`「任务不存在」+返回按钮；500→`ElMessage.error`+重试。`api/index.js` 已对 404 静默，各页自行渲染空态。
+- **模型连接 tag**（TopBar）：当前硬编码 success，**装饰性**；未来接 `/health`+config 校验。文档标注诚实。
+- **`PUT /clauses/{block_code}`**：后端有，前端**暂不接编辑交互**（预留，P2 再做行内编辑）。
+- **`POST /generate` 的 file**：条款库点「生成」时**不传 file**（复用 scan 存的 `latest.xlsx`），只传 `clause`+`block_code`。
+- **空状态文案统一**：A 页 `el-empty`「上传测试集后显示条款」；C 页无 run「选择条款生成后查看详情」。三处文案对齐。
+- **a11y 落地点**：① 状态用 icon+文字不只靠色（§3.2 tag 配 icon）；② 折叠/图标按钮加 `aria-label`；③ `@media (prefers-reduced-motion)` 关 hover 阴影/进度条动画。
+- **原型路径修正**：§0 引用的 `docs/design/prototype-redesign.html` 实际在 **`docs/archive/`**。
+
