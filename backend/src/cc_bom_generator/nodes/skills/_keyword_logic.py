@@ -192,13 +192,15 @@ def _extract_confusion(
     return confusion
 
 
-def _select_diverse(values: List[str], n: int = 5) -> List[str]:
+def _select_diverse_indices(values: List[str], n: int = 5) -> List[int]:
     """
-    从期望值列表中选 n 个互相差异最大的代表性样本。
-    方法：TF-IDF 向量化 → KMeans 聚类 → 每类取离中心最近的样本。
+    TF-IDF + KMeans 聚类，每类取离中心最近的样本，返回其在 values 中的索引列表。
+
+    返回索引而非值，使调用方能同时取回值与对应的行级字段（如 doc_id），
+    供 selected_examples 追溯。
     """
     if len(values) <= n:
-        return list(values)
+        return list(range(len(values)))
 
     try:
         vectorizer = TfidfVectorizer(
@@ -208,13 +210,13 @@ def _select_diverse(values: List[str], n: int = 5) -> List[str]:
         X = vectorizer.fit_transform(values)
     except ValueError:
         # TF-IDF 可能因为全停用词而失败，退化为取前 n 个
-        return list(values[:n])
+        return list(range(min(n, len(values))))
 
     k = min(n, X.shape[0])
     km = KMeans(n_clusters=k, random_state=42, n_init=10)
     km.fit(X)
 
-    selected = []
+    selected_idx: List[int] = []
     for i in range(k):
         cluster_indices = np.where(km.labels_ == i)[0]
         if len(cluster_indices) == 0:
@@ -222,9 +224,14 @@ def _select_diverse(values: List[str], n: int = 5) -> List[str]:
         # 取离中心最近的
         distances = km.transform(X[cluster_indices])[:, i]
         nearest = cluster_indices[distances.argmin()]
-        selected.append(values[nearest])
+        selected_idx.append(int(nearest))
 
-    return selected[:n]
+    return selected_idx[:n]
+
+
+def _select_diverse(values: List[str], n: int = 5) -> List[str]:
+    """聚类选 n 个互相差异最大的代表性样本（字符串），保留供 extract_keywords 等旧调用方。"""
+    return [values[i] for i in _select_diverse_indices(values, n)]
 
 
 def _levenshtein(s1: str, s2: str) -> int:

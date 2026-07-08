@@ -22,7 +22,7 @@ class SelfCheckSkill(BaseSkill):
 
         print(f"  [{self.name}] 规则自检（大模型，温度 {self.temperature}）...")
 
-        positives = state.positive_examples or state.cleaned.positive_values[:5]
+        positives = state.selected_values or state.cleaned.positive_values[:5]
 
         verification = verify_bom(
             bom=state.bom,

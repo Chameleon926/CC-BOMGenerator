@@ -26,7 +26,7 @@ class RuleCheckSkill(BaseSkill):
 
         print(f"  [{self.name}] 程序化规则校验（不用大模型）...")
 
-        positives = state.positive_examples or state.cleaned.positive_values
+        positives = state.selected_values or state.cleaned.positive_values
         interception_rules = state.bom.extraction_rules.absolute_interception_rules
         match_rules = state.bom.extraction_rules.core_match_rules
 

@@ -23,7 +23,7 @@ class ProfileBuildSkill(BaseSkill):
             bom=state.bom,
             keywords=state.keywords,
             confusion_words=state.confusion_words,
-            positive_examples=state.positive_examples,
+            positive_examples=state.selected_values,
             nkw=state.nkw,
             nsec=state.nsec,
             nq=state.nq,

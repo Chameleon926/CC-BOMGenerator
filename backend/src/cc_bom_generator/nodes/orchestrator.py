@@ -143,6 +143,12 @@ class GenerationOrchestrator:
             output_snapshot = None
             if state.bom:
                 output_snapshot = {"bom_version": state.bom.version}
+            if state.selected_examples:
+                # Skill2 选取的代表正例（带 doc_id 行结构），落库供 result.selected_examples 追溯
+                output_snapshot = output_snapshot or {}
+                output_snapshot["selected_examples"] = [
+                    ex.model_dump(mode="json") for ex in state.selected_examples
+                ]
             if state.verification:
                 output_snapshot = output_snapshot or {}
                 output_snapshot["verification_summary"] = state.verification.summary

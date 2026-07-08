@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from .bom import BOM
-from .cleaned_test_set import CleanedTestSet, FullPrompt
+from .cleaned_test_set import CleanedTestSet, FullPrompt, PositiveExample
 from .diagnosis import Verification
 
 
@@ -26,7 +26,11 @@ class GenerationState(BaseModel):
     confusion_words: List[str] = Field(default_factory=list, description="易混淆词")
 
     # ---- Skill 2 (ExampleRetrieve) 产出 ----
-    positive_examples: List[str] = Field(default_factory=list, description="多样性正例")
+    # 注意命名：selected_values=选取正例的期望值字符串(prompt/校验用)；selected_examples=对应行(带doc_id,result用)。
+    # 两者同源同步：selected_values[i] == selected_examples[i].expected_value。不叫 positive_examples 以免与
+    # CleanedTestSet.positive_examples(行) 同名异类型混淆。
+    selected_values: List[str] = Field(default_factory=list, description="Skill2 聚类选取代表正例的期望值字符串（prompt 组装/校验用）")
+    selected_examples: List[PositiveExample] = Field(default_factory=list, description="Skill2 聚类选取的代表正例（带 doc_id 行结构，result/追溯用）")
 
     # ---- Skill 3 (DefinitionRule) 产出 ----
     bom: Optional[BOM] = Field(None, description="语义 BOM（逐步填充）")

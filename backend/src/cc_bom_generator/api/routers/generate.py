@@ -5,10 +5,10 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from threading import Thread
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..deps import get_db
@@ -31,6 +31,10 @@ class GenerateResponse(BaseModel):
     full_prompt: dict
     verification: Optional[dict] = None
     cleaned_test_set: dict = {}
+    selected_examples: List[dict] = Field(
+        default_factory=list,
+        description="Skill2(ExampleRetrieve) 聚类选取的代表正例（含 doc_id 等行级字段，追溯用）",
+    )
 
 
 @router.get("/health")
@@ -114,6 +118,49 @@ def _bg_generate(run_id: int, state: GenerationState) -> None:
         log.error(f"后台 generate run_id={run_id} 失败: {e}")
 
 
+# ==================== 任务列表 + 停止 ====================
+
+@router.get("/runs")
+def list_runs(block_code: str = "", db: Session = Depends(get_db)):
+    """查生成任务列表（可按 block_code 筛选，含进度%）。"""
+    TOTAL_STEPS = 7
+    q = db.query(PipelineRun)
+    if block_code:
+        q = q.filter(PipelineRun.block_code == block_code)
+    runs = q.order_by(PipelineRun.id.desc()).all()
+    result = []
+    for r in runs:
+        done = db.query(NodeExecution).filter_by(pipeline_run_id=r.id, is_retry=False).count()
+        result.append({
+            "run_id": r.id,
+            "block_code": r.block_code,
+            "status": r.run_status,
+            "progress": min(100, round(done / TOTAL_STEPS * 100)) if TOTAL_STEPS else 0,
+            "done_nodes": done,
+            "total_steps": TOTAL_STEPS,
+            "started_at": r.started_at,
+            "finished_at": r.finished_at,
+            "duration_ms": r.duration_ms,
+            "error_message": r.error_message,
+        })
+    return {"runs": result}
+
+
+@router.post("/runs/{run_id}/stop")
+def stop_run(run_id: int, db: Session = Depends(get_db)):
+    """停止生成任务（标记 cancelled，后台 Thread 自然结束）。"""
+    from datetime import datetime
+    run = db.get(PipelineRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail=f"run {run_id} 不存在")
+    if run.run_status != "running":
+        raise HTTPException(status_code=400, detail=f"run {run_id} 状态 {run.run_status}，无法停止")
+    run.run_status = "cancelled"
+    run.finished_at = datetime.now()
+    db.commit()
+    return {"status": "ok", "run_id": run_id}
+
+
 # ==================== 进度查询 ====================
 
 @router.get("/runs/{run_id}/status")
@@ -152,18 +199,28 @@ def run_status(run_id: int, db: Session = Depends(get_db)):
 
 @router.get("/runs/{run_id}/result")
 def run_result(run_id: int, db: Session = Depends(get_db)):
-    """run 成功后取完整结果（BOM + 提示词，粘新平台跑分用）。"""
+    """取 run 结果（BOM + 提示词 + 选取正例）。不限 success：失败/取消也返回已产出部分。
+
+    selected_examples 在 Skill2(ExampleRetrieve) 落库，即使后续 Skill3 失败，任务详情也能
+    展示「已选取的正例」（对齐原型）。bom/prompt 未完成则为空，前端按存在性渲染。
+    """
     run = db.get(PipelineRun, run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"run {run_id} 不存在")
-    if run.run_status != "success":
-        raise HTTPException(
-            status_code=409,
-            detail=f"run status={run.run_status}，未完成或失败，无法取结果",
-        )
+    # 取 Skill2(ExampleRetrieve) 选出的代表正例（带 doc_id），从节点 output_json 读
+    ex_node = (
+        db.query(NodeExecution)
+        .filter_by(pipeline_run_id=run_id, skill_name="ExampleRetrieveSkill", is_retry=False)
+        .order_by(NodeExecution.seq)
+        .first()
+    )
+    selected: List[dict] = []
+    if ex_node and ex_node.output_json:
+        selected = ex_node.output_json.get("selected_examples") or []
     return GenerateResponse(
         bom=run.output_bom_json or {},
         full_prompt={"prompt_text": run.output_prompt_text or ""},
+        selected_examples=selected,
     )
 
 

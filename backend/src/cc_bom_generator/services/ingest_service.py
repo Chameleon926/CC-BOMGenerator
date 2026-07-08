@@ -12,7 +12,7 @@ from typing import Optional
 
 import pandas as pd
 
-from ..schemas.cleaned_test_set import CleanedTestSet
+from ..schemas.cleaned_test_set import CleanedTestSet, PositiveExample
 
 
 def parse_excel_to_cleaned(
@@ -36,11 +36,17 @@ def parse_excel_to_cleaned(
     block_name_col = find_col(df, ["block_name", "语义块名称", "块/项名称", "条款名称"])
     block_code_col = find_col(df, ["block_code", "语义块编码", "块/项编码", "条款编码"])
 
+    # 行级字段（保留 doc_id 等，供 Skill2 选取代表正例时带回 doc_id / 追溯）
+    doc_id_col = find_col(df, ["doc_id", "文档id", "文档编号"])
+    item_code_col = find_col(df, ["item_code", "子项编码", "项编码"])
+    item_name_col = find_col(df, ["item_name", "子项名称", "项名称"])
+    doc_name_col = find_col(df, ["doc_name", "文档名称"])
+
     # 如果有 block_code 列，按条款分组取指定条款
     if block_code_col and block_code:
         df = df[df[block_code_col].astype(str).str.strip() == block_code]
 
-    # 提取期望值并去重
+    # 提取期望值并去重（字符串，关键词抽取用）
     values = [
         str(v).strip()
         for v in df[expected_col]
@@ -54,6 +60,26 @@ def parse_excel_to_cleaned(
             seen.add(v)
             unique_values.append(v)
 
+    # 全行正例（保留 doc_id 等行级字段，精确去重；供选取/追溯）
+    positive_examples: list[PositiveExample] = []
+    seen_rows: set[tuple] = set()
+    for _, row in df.iterrows():
+        ev = str(row[expected_col]).strip()
+        if not ev:
+            continue
+        doc_id = str(row[doc_id_col]).strip() if doc_id_col else ""
+        item_code = str(row[item_code_col]).strip() if item_code_col else ""
+        item_name = str(row[item_name_col]).strip() if item_name_col else ""
+        doc_name = str(row[doc_name_col]).strip() if doc_name_col else ""
+        row_key = (doc_id, ev, item_code, item_name, doc_name)
+        if row_key in seen_rows:
+            continue
+        seen_rows.add(row_key)
+        positive_examples.append(PositiveExample(
+            doc_id=doc_id, expected_value=ev,
+            item_code=item_code, item_name=item_name, doc_name=doc_name,
+        ))
+
     # 从数据中取 block_code / clause
     if not block_code and block_code_col:
         block_code = str(df[block_code_col].iloc[0]).strip() if len(df) > 0 else ""
@@ -66,6 +92,7 @@ def parse_excel_to_cleaned(
         block_code=block_code,
         domain=domain,
         positive_values=unique_values,
+        positive_examples=positive_examples,
         original_count=len(values),
         after_dedup=len(unique_values),
     )

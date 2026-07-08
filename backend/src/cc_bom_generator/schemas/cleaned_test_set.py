@@ -7,6 +7,20 @@ from typing import List
 from .bom import BOM
 
 
+class PositiveExample(BaseModel):
+    """单个正例行 —— 保留源测试集的行级身份（doc_id 等），供选取/追溯。
+
+    与 CleanedTestSet.positive_values（去重压平的期望值字符串）的区别：
+    positive_values 丢掉 doc_id，只供关键词统计；本结构保留全行字段，
+    使 Skill2 聚类选出的代表正例能带回 doc_id（result.selected_examples 可追溯）。
+    """
+    doc_id: str = Field("", description="源测试集文档ID")
+    expected_value: str = Field("", description="期望值（正例文本）")
+    item_code: str = Field("", description="条款子项编码")
+    item_name: str = Field("", description="条款子项名称")
+    doc_name: str = Field("", description="文档名称")
+
+
 class CleanedTestSet(BaseModel):
     """A 模块清洗后交付给 B 模块的测试集。"""
     clause: str = Field("", description="条款名称")
@@ -14,7 +28,10 @@ class CleanedTestSet(BaseModel):
     domain: str = Field("", description="业务域（采购/销售/服务/工程/框架）")
 
     positive_values: List[str] = Field(
-        default_factory=list, description="去重后的期望值列表（正例，已清洗）"
+        default_factory=list, description="去重后的期望值字符串列表（关键词抽取用，不含 doc_id）"
+    )
+    positive_examples: List[PositiveExample] = Field(
+        default_factory=list, description="全行正例（保留 doc_id 等行级字段，选取/追溯用；精确去重）"
     )
     positive_contexts: List[str] = Field(
         default_factory=list, description="对应的上下文原文（可选）"

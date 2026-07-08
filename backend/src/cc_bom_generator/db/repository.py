@@ -72,6 +72,19 @@ class PipelineRepository:
             log.error(f"pipeline_run {run_id} 不存在")
             return
 
+        # 守护：已 cancelled 的 run 不被覆盖。用户 POST /runs/{id}/stop 标 cancelled 后，
+        # 后台 daemon Thread 仍会跑完并触发 finally 的 finish(status=success/fail)，
+        # 以及中途快照 finish(status="running")；此处保证 cancelled 终态不被改回。
+        # 用列查询读 DB 最新值，绕开本 session 的 identity map 缓存（后台线程独立 session）。
+        current_status = (
+            self.session.query(PipelineRun.run_status)
+            .filter(PipelineRun.id == run_id)
+            .scalar()
+        )
+        if current_status == "cancelled":
+            log.info(f"pipeline_run {run_id} 已 cancelled，跳过 finish(status={status}) 不覆盖")
+            return
+
         run.run_status = status
         run.finished_at = datetime.now()
         if run.started_at:
