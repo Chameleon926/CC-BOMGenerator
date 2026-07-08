@@ -1,301 +1,336 @@
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import axios from 'axios'
 
-const API = '/api' // vite 代理 → backend:8000
+const API = '/api'
 
-// ① 设计环节
-const file = ref(null)
-const clause = ref('')
-const blockCode = ref('')
-const nkw = ref(10), nsec = ref(6), nq = ref(3), skipVerify = ref(false)
+// ===== 侧边栏菜单 =====
+const activeMenu = ref('generate')
+const menuItems = [
+  { key: 'generate', label: 'BOM 生成工作台', icon: 'MagicStick' },
+  { key: 'config', label: '模型配置', icon: 'Setting' },
+]
+
+// ===== 左半屏：数据预处理 =====
 const fileName = ref('')
-const onFileChange = (e) => { file.value = e.target.files[0]; fileName.value = file.value?.name || '' }
-const clearFile = () => { file.value = null; fileName.value = '' }
+const uploadedFile = ref(null)
+const clauses = ref([])
+const scanning = ref(false)
+const selectedClause = ref(null)
+const searchQuery = ref('')
 
-// 状态机
-const phase = ref('idle') // idle | running | done | error
-const runId = ref(null)
-const statusData = ref(null)
-const result = ref(null)
-const error = ref('')
-let pollTimer = null
+const onUploadChange = async (uploadFile) => {
+  const file = uploadFile.raw || uploadFile
+  if (!file) return
+  uploadedFile.value = file
+  fileName.value = file.name
+  scanning.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await axios.post(`${API}/testset/scan`, form)
+    clauses.value = data.clauses
+    if (data.clauses.length) selectedClause.value = data.clauses[0]
+  } catch (e) {
+    ElMessage.error('扫描失败：' + (e.response?.data?.detail || e.message))
+  } finally {
+    scanning.value = false
+  }
+}
 
-const TOTAL_STEPS = 7              // 7 个 Skill（不含回修）
-const POLL_INTERVAL = 2000
-const POLL_MAX_MS = 5 * 60 * 1000  // C1: 超时熔断
-const POLL_MAX_FAILS = 5           // C2: 连续失败上限
+const filteredClauses = computed(() => {
+  if (!searchQuery.value.trim()) return clauses.value
+  const q = searchQuery.value.toLowerCase()
+  return clauses.value.filter(c =>
+    (c.block_name || '').toLowerCase().includes(q) || c.block_code.toLowerCase().includes(q)
+  )
+})
 
-const stopPolling = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null } }
-
-const startGenerate = async () => {
-  if (!file.value) { error.value = '请先上传测试集 Excel'; return }
-  phase.value = 'running'; error.value = ''; result.value = null; statusData.value = null
+// ===== 右半屏：生成 =====
+const runs = reactive({})
+const startGenerate = async (block_code) => {
+  const c = clauses.value.find(c => c.block_code === block_code)
+  if (!c) return
+  const r = reactive({ run_id: null, phase: 'running', statusData: null, result: null, error: '', pollTimer: null })
+  runs[block_code] = r
   const form = new FormData()
-  form.append('file', file.value)
-  if (clause.value) form.append('clause', clause.value)
-  if (blockCode.value) form.append('block_code', blockCode.value)
-  form.append('nkw', nkw.value); form.append('nsec', nsec.value); form.append('nq', nq.value)
-  form.append('skip_verify', skipVerify.value)
+  form.append('clause', c.block_name)
+  form.append('block_code', c.block_code)
   try {
     const { data } = await axios.post(`${API}/generate`, form)
-    runId.value = data.run_id
-    startPolling()
+    r.run_id = data.run_id
+    startPoll(block_code, r)
   } catch (e) {
-    phase.value = 'error'
-    error.value = (e.response?.data?.detail) || e.message || '启动生成失败'
+    r.phase = 'error'
+    r.error = e.response?.data?.detail || e.message
   }
 }
-
-const startPolling = () => {
-  const pollStart = Date.now()
-  let failCount = 0
-  pollTimer = setInterval(async () => {
-    if (Date.now() - pollStart > POLL_MAX_MS) {                         // C1 超时熔断
-      stopPolling(); phase.value = 'error'; error.value = '生成超时（超过 5 分钟）'; return
-    }
+const startPoll = (bc, r) => {
+  const start = Date.now()
+  let fails = 0
+  r.pollTimer = setInterval(async () => {
+    if (Date.now() - start > 5 * 60 * 1000) { stopPoll(r); r.phase = 'error'; r.error = '超时'; return }
     try {
-      const { data } = await axios.get(`${API}/runs/${runId.value}/status`)
-      statusData.value = data; failCount = 0                           // C2 成功重置
+      const { data } = await axios.get(`${API}/runs/${r.run_id}/status`)
+      r.statusData = data; fails = 0
       if (data.status === 'success' || data.status === 'fail') {
-        stopPolling()
-        if (data.status === 'success') await fetchResult()
-        else { phase.value = 'error'; error.value = data.error_message || '生成失败（查看节点 ✗）' }
+        stopPoll(r)
+        if (data.status === 'success') {
+          try { const { data: res } = await axios.get(`${API}/runs/${r.run_id}/result`); r.result = res; r.phase = 'done' }
+          catch (e) { r.phase = 'error'; r.error = '结果拉取失败' }
+        } else { r.phase = 'error'; r.error = data.error_message || '生成失败' }
       }
-    } catch (e) {                                                       // C2 连续失败
-      failCount += 1
-      if (failCount >= POLL_MAX_FAILS) {
-        stopPolling(); phase.value = 'error'
-        error.value = '后端连接中断（连续 ' + POLL_MAX_FAILS + ' 次轮询失败）'
-      }
-    }
-  }, POLL_INTERVAL)
+    } catch (e) { fails++; if (fails >= 5) { stopPoll(r); r.phase = 'error'; r.error = '连接中断' } }
+  }, 2000)
+}
+const stopPoll = (r) => { if (r?.pollTimer) { clearInterval(r.pollTimer); r.pollTimer = null } }
+
+const currentRun = computed(() => selectedClause.value ? runs[selectedClause.value.block_code] : null)
+const currentBom = computed(() => currentRun.value?.result?.bom)
+const currentPrompt = computed(() => currentRun.value?.result?.full_prompt?.prompt_text || '')
+
+const SKILL_NAMES = {
+  FeatureExtractSkill: '关键词抽取', ExampleRetrieveSkill: '正例挑选',
+  DefinitionRuleSkill: '定义+规则生成', ProfileBuildSkill: '召回画像',
+  RuleCheckSkill: '规则校验', SelfCheckSkill: '自检', PromptAssembleSkill: '提示词组装',
+}
+const skillName = s => SKILL_NAMES[s] || s
+
+const copyPrompt = async () => {
+  if (!currentPrompt.value) return
+  try { await navigator.clipboard.writeText(currentPrompt.value); ElMessage.success('提示词已复制') }
+  catch { ElMessage.error('复制失败') }
 }
 
-const fetchResult = async () => {                                       // I3 防静默死锁
+// 初始化：从后端取已持久化的条款列表（刷新页面不丢）
+onMounted(async () => {
   try {
-    const { data } = await axios.get(`${API}/runs/${runId.value}/result`)
-    result.value = data; phase.value = 'done'
-  } catch (e) {
-    phase.value = 'error'; error.value = '结果拉取失败：' + ((e.response?.data?.detail) || e.message)
-  }
-}
-
-const reset = () => {                                                   // I7 清文件
-  stopPolling()
-  phase.value = 'idle'; runId.value = null; statusData.value = null; result.value = null; error.value = ''
-  file.value = null; fileName.value = ''
-}
-
-onUnmounted(stopPolling)
-
-const copyPrompt = async () => {                                        // I4 clipboard 降级
-  const text = result.value?.full_prompt?.prompt_text || ''
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-    } else {                                                           // 非 secure context 降级
-      const ta = document.createElement('textarea')
-      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
+    const { data } = await axios.get(`${API}/clauses`)
+    if (data.clauses?.length) {
+      clauses.value = data.clauses.map(c => ({
+        block_code: c.block_code,
+        block_name: c.block_name,
+        positive_count: 0,
+        sheets: [],
+      }))
     }
-    alert('提示词已复制，可粘贴到新平台跑分')
-  } catch {
-    alert('复制失败，请手动选择提示词文本复制')
-  }
-}
-
-// Skill 中文名 + 业务描述（业务用户看得懂）
-const SKILL_META = {
-  FeatureExtractSkill: { name: '关键词抽取', desc: '从正例文本抽取短词关键词、易混淆词，并聚类挑选多样正例（程序化算法，不调大模型，防过拟合）' },
-  ExampleRetrieveSkill: { name: '正例挑选', desc: '从候选中按多样性聚类挑选代表性正例，作为向量召回的锚点' },
-  DefinitionRuleSkill: { name: '定义 + 规则生成', desc: '大模型基于关键词产出语义定义 + 拦截规则（防误抽）+ 匹配规则（防漏抽）' },
-  ProfileBuildSkill: { name: '召回画像组装', desc: '大模型组装召回画像：正向关键词、易混淆词、章节提示、语义查询句、正例' },
-  RuleCheckSkill: { name: '规则校验', desc: '程序化检查拦截规则是否误杀正例（不调大模型），若误杀则触发回修' },
-  SelfCheckSkill: { name: '自检', desc: '大模型自检 BOM 是否有红旗（规则矛盾 / 过拟合 / 漏覆盖），有红旗则触发回修' },
-  PromptAssembleSkill: { name: '提示词组装', desc: '把定义 + 规则 + 画像 + 输出 JSON Schema 组装成完整提示词，供新平台跑分' },
-}
-const skillName = (s) => SKILL_META[s]?.name || s
-const skillDesc = (s) => SKILL_META[s]?.desc || '（暂无描述）'
-
-// 进度：首次执行的节点数（不含回修）
-const firstPassNodes = computed(() => (statusData.value?.nodes || []).filter(n => !n.is_retry))
-const progress = computed(() => Math.min(100, Math.round(firstPassNodes.value.length / TOTAL_STEPS * 100)))
-const elapsed = computed(() => statusData.value?.duration_ms ? Math.round(statusData.value.duration_ms / 1000) + 's' : '—')
+  } catch (e) { /* 后端未起或无数据 */ }
+})
 </script>
 
 <template>
-  <div class="app">
-    <header>
-      <h1>语义 BOM 生成 demo</h1>
-      <p class="sub">上传测试集 → 实时看节点进度 → 出 BOM + 完整提示词（粘新平台跑分）</p>
-    </header>
-
-    <!-- ① 设计环节 -->
-    <section class="card" v-if="phase === 'idle' || phase === 'error'">
-      <h2>① 设计环节 · 上传测试集 & 参数</h2>
-      <div class="form">
-        <label class="file-label">
-          <span>测试集 Excel（必填，需含「期望值」列；可选「Block Code」「Block Name」列）</span>
-          <div class="file-drop">
-            <input type="file" @change="onFileChange" accept=".xlsx,.xls,.csv" />
-            <span class="file-name">{{ fileName || '点击选择文件…' }}</span>
-            <button v-if="fileName" type="button" class="clear-btn" @click.stop="clearFile" title="移除文件">×</button>
-          </div>
-        </label>
-        <div class="row">
-          <label>条款名称（可选，空则从测试集聚）
-            <input v-model="clause" placeholder="如：付款支持文档" />
-          </label>
-          <label>语义块编码（可选）
-            <input v-model="blockCode" placeholder="如：FSB0000004" />
-          </label>
+  <div class="h-screen flex overflow-hidden bg-slate-50">
+    <!-- ===== 左侧 Sidebar 240px ===== -->
+    <aside class="w-60 bg-white border-r border-slate-200 flex flex-col flex-shrink-0">
+      <!-- Logo -->
+      <div class="h-15 flex items-center gap-2.5 px-5 border-b border-slate-100" style="height:60px">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-base font-bold" style="background:linear-gradient(135deg,#409EFF,#7c3aed)">
+          <el-icon><Monitor /></el-icon>
         </div>
-        <div class="row numbers">
-          <label>关键词数 <input type="number" v-model.number="nkw" /></label>
-          <label>章节数 <input type="number" v-model.number="nsec" /></label>
-          <label>语义查询数 <input type="number" v-model.number="nq" /></label>
-          <label class="check"><input type="checkbox" v-model="skipVerify" /> 跳过自检</label>
-        </div>
-        <button @click="startGenerate">开始生成</button>
-        <p class="error" v-if="error">⚠ {{ error }}</p>
-      </div>
-    </section>
-
-    <!-- ② 进度环节 -->
-    <section class="card" v-if="phase === 'running' || phase === 'done'">
-      <h2>
-        ② 进度环节 · 实时节点状态
-        <span class="badge" :class="statusData?.status">{{ statusData?.status }}</span>
-        <span class="elapsed" v-if="phase === 'done'">耗时 {{ elapsed }}</span>
-      </h2>
-      <div class="progress-bar"><div class="progress-fill" :style="{ width: progress + '%' }"></div></div>
-      <p class="progress-text">首次执行 {{ firstPassNodes.length }} / {{ TOTAL_STEPS }} 节点</p>
-      <div class="nodes">
-        <details v-for="n in statusData?.nodes" :key="n.seq + '-' + n.skill" class="node-details" :class="{ retry: n.is_retry, fail: !n.success }">
-          <summary>
-            <span class="seq">{{ n.is_retry ? '↻' : n.seq }}</span>
-            <span class="skill">{{ skillName(n.skill) }}</span>
-            <span class="ok" :class="{ ok2: n.success, nok: !n.success }">{{ n.success ? '✓' : '✗' }}</span>
-            <span class="dur">{{ n.duration_ms }}ms</span>
-            <span class="expand-hint">展开 ▾</span>
-          </summary>
-          <div class="node-body">
-            <p class="node-desc">{{ skillDesc(n.skill) }}</p>
-            <p class="retry-tag" v-if="n.is_retry">↻ 回修重跑（第 {{ n.retry_round }} 次）—— 首轮自检/规则校验发现问题，重新生成定义/画像/规则</p>
-          </div>
-        </details>
-        <div v-if="phase === 'running'" class="node running-pending">
-          <span class="spinner"></span>
-          <span class="skill">正在处理下一个节点…</span>
+        <div>
+          <div class="text-sm font-bold text-slate-800 leading-tight">语义 BOM 工作台</div>
+          <div class="text-xs text-slate-400">BOM Generator Studio</div>
         </div>
       </div>
-      <button class="ghost" v-if="phase === 'done'" @click="reset">重新生成</button>
-    </section>
-
-    <!-- ③ 输出环节 -->
-    <section class="card" v-if="result">
-      <h2>③ 输出环节 · BOM + 完整提示词</h2>
-      <div class="bom-summary">
-        <span><b>条款：</b>{{ result.bom.clause }}</span>
-        <span><b>编码：</b>{{ result.bom.block_code }}</span>
-        <span><b>版本：</b>v{{ result.bom.version }}</span>
-      </div>
-
-      <details open>
-        <summary>语义定义</summary>
-        <p class="def">{{ result.bom.semantic_definition }}</p>
-      </details>
-
-      <details>
-        <summary>拦截规则（{{ result.bom.extraction_rules?.absolute_interception_rules?.length }} 条 · 防误抽）</summary>
-        <ul><li v-for="(r, i) in result.bom.extraction_rules?.absolute_interception_rules" :key="i">{{ r.rule }}</li></ul>
-      </details>
-
-      <details>
-        <summary>匹配规则（{{ result.bom.extraction_rules?.core_match_rules?.length }} 条 · 防漏抽）</summary>
-        <ul><li v-for="(r, i) in result.bom.extraction_rules?.core_match_rules" :key="i">{{ r.rule }}</li></ul>
-      </details>
-
-      <details>
-        <summary>召回画像</summary>
-        <div class="profile">
-          <div><b>正向关键词：</b><span class="tags">{{ result.bom.recall_profile?.positive_keywords?.join(' · ') }}</span></div>
-          <div><b>易混淆词：</b><span class="tags conf">{{ result.bom.recall_profile?.confusion_words?.join(' · ') }}</span></div>
-          <div><b>章节提示：</b>{{ result.bom.recall_profile?.section_hints?.join(' · ') }}</div>
-          <div><b>语义查询：</b><ul><li v-for="(q, i) in result.bom.recall_profile?.semantic_queries" :key="i">{{ q }}</li></ul></div>
-          <div><b>正例（召回锚点）：</b><ul><li v-for="(e, i) in result.bom.recall_profile?.positive_examples" :key="i">{{ e }}</li></ul></div>
+      <!-- 菜单 -->
+      <nav class="flex-1 py-3 px-2.5 space-y-1">
+        <div v-for="item in menuItems" :key="item.key"
+             class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium transition-all"
+             :class="activeMenu === item.key
+               ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30'
+               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'"
+             @click="activeMenu = item.key">
+          <el-icon :size="17"><component :is="item.icon" /></el-icon>
+          <span>{{ item.label }}</span>
         </div>
-      </details>
+      </nav>
+    </aside>
 
-      <details>
-        <summary>完整提示词（粘新平台跑分）<button class="copy" @click.stop="copyPrompt">复制</button></summary>
-        <pre>{{ result.full_prompt?.prompt_text }}</pre>
-      </details>
-    </section>
+    <!-- ===== 右侧主体 ===== -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- 顶栏 60px -->
+      <header class="h-15 bg-white border-b border-slate-200 flex items-center px-6 gap-3 flex-shrink-0" style="height:60px">
+        <span class="text-base font-semibold text-slate-700">BOM 生成工作台</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-sm text-slate-400">{{ selectedClause?.block_name || '请上传测试集' }}</span>
+        <div class="flex-1"></div>
+        <el-tag type="success" effect="light" round>
+          <el-icon class="mr-1"><CircleCheckFilled /></el-icon> 模型已连接
+        </el-tag>
+      </header>
+
+      <!-- ===== 主工作区：左右分屏 ===== -->
+      <main class="flex-1 overflow-hidden p-4">
+        <div class="h-full flex gap-4">
+
+          <!-- ===== 左半屏：数据预处理 ===== -->
+          <section class="w-1/2 flex flex-col gap-3 overflow-hidden">
+            <!-- 上传 -->
+            <el-upload
+              class="block"
+              drag
+              :auto-upload="false"
+              :show-file-list="false"
+              accept=".xlsx,.xls,.csv"
+              :on-change="onUploadChange"
+            >
+              <div class="flex flex-col items-center py-4">
+                <el-icon class="text-3xl text-blue-400 mb-2"><Upload /></el-icon>
+                <div class="text-sm text-slate-500" v-if="!fileName">拖拽或点击上传测试集 Excel（多 sheet / 多条款）</div>
+                <div class="text-sm text-green-600 font-medium" v-else>✓ {{ fileName }}</div>
+              </div>
+            </el-upload>
+
+            <!-- 去重统计 -->
+            <div v-if="clauses.length" class="flex gap-2 flex-wrap">
+              <el-tag type="primary" effect="plain">条款数：{{ clauses.length }}</el-tag>
+              <el-tag type="success" effect="plain">总用例：{{ clauses.reduce((s, c) => s + c.positive_count, 0) }}</el-tag>
+              <el-tag type="info" effect="plain">完成：{{ Object.values(runs).filter(r => r.phase === 'done').length }}</el-tag>
+            </div>
+
+            <!-- 条款列表（el-table）-->
+            <el-card class="flex-1 overflow-hidden" shadow="never" body-class="p-0">
+              <template #header>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-semibold text-slate-600">条款 / 要素列表</span>
+                  <el-input v-model="searchQuery" placeholder="搜索..." prefix-icon="Search" clearable size="small" style="width:160px" :disabled="!clauses.length" />
+                </div>
+              </template>
+              <el-table :data="filteredClauses" highlight-current-row size="small"
+                        @current-change="(row) => row && (selectedClause = row)"
+                        :row-class-name="({ row }) => selectedClause?.block_code === row.block_code ? 'current-row' : ''"
+                        height="100%" empty-text="上传测试集后显示条款">
+                <el-table-column prop="block_name" label="条款名称" min-width="120">
+                  <template #default="{ row }">
+                    <span class="font-medium text-slate-700">{{ row.block_name || row.block_code }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="block_code" label="编码" width="120" />
+                <el-table-column prop="positive_count" label="用例" width="60" align="center" />
+                <el-table-column label="状态" width="90" align="center">
+                  <template #default="{ row }">
+                    <el-tag v-if="runs[row.block_code]?.phase === 'done'" type="success" size="small">已生成</el-tag>
+                    <el-tag v-else-if="runs[row.block_code]?.phase === 'running'" type="warning" size="small">生成中</el-tag>
+                    <el-tag v-else-if="runs[row.block_code]?.phase === 'error'" type="danger" size="small">失败</el-tag>
+                    <el-tag v-else type="info" size="small">待生成</el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-card>
+          </section>
+
+          <!-- ===== 右半屏：生成结果 ===== -->
+          <section class="w-1/2 flex flex-col gap-3 overflow-y-auto pr-1">
+            <!-- 操作栏 -->
+            <div class="flex items-center gap-3">
+              <div class="flex-1">
+                <div class="text-lg font-bold text-slate-800">{{ selectedClause?.block_name || '选择左侧条款' }}</div>
+                <div class="text-xs text-slate-400" v-if="selectedClause">{{ selectedClause.block_code }} · {{ selectedClause.positive_count }} 用例</div>
+              </div>
+              <el-button type="primary" size="default" icon="Promotion" :loading="currentRun?.phase === 'running'"
+                         :disabled="!selectedClause || !uploadedFile"
+                         @click="startGenerate(selectedClause.block_code)">
+                {{ currentRun?.phase === 'done' ? '重新生成' : '🚀 生成语义 BOM' }}
+              </el-button>
+            </div>
+
+            <!-- 进度 -->
+            <el-card v-if="currentRun?.statusData" shadow="never">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-sm font-semibold text-slate-600">执行进度</span>
+                <el-tag :type="currentRun.statusData.status === 'success' ? 'success' : currentRun.statusData.status === 'fail' ? 'danger' : 'warning'" size="small">
+                  {{ currentRun.statusData.status }}
+                </el-tag>
+                <span class="text-xs text-slate-400" v-if="currentRun.statusData.duration_ms">· {{ Math.round(currentRun.statusData.duration_ms / 1000) }}s</span>
+              </div>
+              <div class="space-y-1.5">
+                <div v-for="(n, i) in currentRun.statusData.nodes" :key="i"
+                     class="flex items-center gap-2 text-xs py-1" :class="{ 'pl-4 text-orange-500': n.is_retry }">
+                  <span class="w-5 text-slate-400 text-center">{{ n.is_retry ? '↻' : n.seq }}</span>
+                  <span class="flex-1 text-slate-600">{{ skillName(n.skill) }}</span>
+                  <el-icon :color="n.success ? '#16a34a' : '#dc2626'">
+                    <CircleCheckFilled v-if="n.success" /><WarningFilled v-else />
+                  </el-icon>
+                  <span class="text-slate-300 w-12 text-right">{{ n.duration_ms }}ms</span>
+                </div>
+                <div v-if="currentRun.phase === 'running'" class="text-blue-500 text-xs py-1 flex items-center gap-1">
+                  <el-icon class="is-loading"><Loading /></el-icon> 处理中…
+                </div>
+              </div>
+            </el-card>
+
+            <!-- BOM 结构化预览 -->
+            <el-card v-if="currentBom" shadow="never">
+              <template #header>
+                <span class="text-sm font-semibold text-slate-600">BOM 结构化预览</span>
+                <span class="text-xs text-slate-400 ml-2">v{{ currentBom.version }}</span>
+              </template>
+              <el-descriptions :column="1" border size="small">
+                <el-descriptions-item label="语义定义">
+                  <span class="text-sm leading-relaxed text-slate-600">{{ currentBom.semantic_definition }}</span>
+                </el-descriptions-item>
+                <el-descriptions-item v-if="currentBom.extraction_rules?.absolute_interception_rules?.length" label="拦截规则">
+                  <div class="space-y-1.5">
+                    <div v-for="(r, i) in currentBom.extraction_rules.absolute_interception_rules" :key="i">
+                      <el-tag type="danger" size="small" effect="plain" class="mr-1">{{ r.scene || '场景' }}</el-tag>
+                      <span class="text-sm text-slate-600">{{ r.rule }}</span>
+                      <div class="text-xs text-slate-400 ml-1" v-if="r.logic">逻辑：{{ r.logic }}</div>
+                    </div>
+                  </div>
+                </el-descriptions-item>
+                <el-descriptions-item v-if="currentBom.extraction_rules?.poison_words?.length" label="毒药词">
+                  <el-tag v-for="w in currentBom.extraction_rules.poison_words" :key="w" type="danger" effect="dark" size="small" class="mr-1.5 mb-1">{{ w }}</el-tag>
+                </el-descriptions-item>
+                <el-descriptions-item v-if="currentBom.extraction_rules?.core_match_rules?.length" label="匹配规则">
+                  <div class="space-y-1.5">
+                    <div v-for="(r, i) in currentBom.extraction_rules.core_match_rules" :key="i">
+                      <el-tag type="primary" size="small" effect="plain" class="mr-1">{{ r.scene || '场景' }}</el-tag>
+                      <span class="text-sm text-slate-600">{{ r.rule }}</span>
+                      <div class="text-xs text-slate-400 ml-1" v-if="r.logic">逻辑：{{ r.logic }}</div>
+                    </div>
+                  </div>
+                </el-descriptions-item>
+                <el-descriptions-item v-if="currentBom.reasoning_chain?.length" label="排雷思维链">
+                  <ol class="text-sm text-slate-600 list-decimal ml-4 space-y-0.5">
+                    <li v-for="(s, i) in currentBom.reasoning_chain" :key="i">{{ s }}</li>
+                  </ol>
+                </el-descriptions-item>
+                <el-descriptions-item v-if="currentBom.recall_profile" label="召回画像">
+                  <div class="space-y-1 text-sm">
+                    <div><span class="text-slate-400">关键词：</span>
+                      <el-tag v-for="w in currentBom.recall_profile.positive_keywords" :key="w" type="primary" effect="plain" size="small" class="mr-1 mb-0.5">{{ w }}</el-tag>
+                    </div>
+                    <div><span class="text-slate-400">易混淆：</span>
+                      <el-tag v-for="w in currentBom.recall_profile.confusion_words" :key="w" type="warning" effect="plain" size="small" class="mr-1 mb-0.5">{{ w }}</el-tag>
+                    </div>
+                    <div><span class="text-slate-400">章节：</span>{{ currentBom.recall_profile.section_hints?.join(' · ') }}</div>
+                  </div>
+                </el-descriptions-item>
+              </el-descriptions>
+            </el-card>
+
+            <!-- 完整提示词（代码块 + 复制）-->
+            <el-card v-if="currentPrompt" shadow="never">
+              <template #header>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-semibold text-slate-600">完整提示词（粘新平台跑分）</span>
+                  <el-button type="primary" size="small" plain icon="CopyDocument" @click="copyPrompt">复制</el-button>
+                </div>
+              </template>
+              <pre class="text-xs leading-relaxed overflow-auto max-h-72 p-3 rounded font-mono"
+                   style="background:#0f172a;color:#e2e8f0">{{ currentPrompt }}</pre>
+            </el-card>
+
+            <!-- 空状态 -->
+            <div v-if="!currentRun" class="flex-1 flex flex-col items-center justify-center text-slate-300">
+              <el-icon :size="40" class="mb-3"><MagicStick /></el-icon>
+              <div class="text-sm">选择左侧条款并点击「生成语义 BOM」</div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+    </div>
   </div>
 </template>
-
-<style>
-* { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #222; }
-.app { max-width: 920px; margin: 0 auto; padding: 24px 16px 60px; }
-header h1 { margin: 0 0 4px; font-size: 24px; }
-.sub { margin: 0 0 20px; color: #666; font-size: 13px; }
-.card { background: #fff; border-radius: 10px; padding: 20px 22px; margin: 14px 0; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-h2 { font-size: 17px; margin: 0 0 16px; display: flex; align-items: center; gap: 10px; }
-.form { display: flex; flex-direction: column; gap: 14px; }
-.form label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #444; }
-.form input[type=text], .form input:not([type]) { padding: 8px 10px; border: 1px solid #d9dce1; border-radius: 6px; font-size: 14px; }
-.form input:focus { outline: none; border-color: #4a90d9; }
-.file-drop { position: relative; border: 1.5px dashed #c4c8cf; border-radius: 6px; padding: 18px; text-align: center; cursor: pointer; }
-.file-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.file-name { color: #4a90d9; font-size: 14px; }
-.clear-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: #d9534f; color: #fff; border: none; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
-.row { display: flex; gap: 14px; flex-wrap: wrap; }
-.row > label { flex: 1; min-width: 180px; }
-.row.numbers > label { max-width: 130px; }
-.check { flex-direction: row !important; align-items: center; gap: 6px !important; }
-button { background: #4a90d9; color: #fff; border: none; padding: 11px 22px; border-radius: 6px; cursor: pointer; font-size: 14px; align-self: flex-start; }
-button:hover { background: #357abd; }
-button.ghost { background: #fff; color: #4a90d9; border: 1px solid #4a90d9; }
-button.copy { padding: 3px 10px; font-size: 12px; background: #5cb85c; }
-.error { color: #d9534f; font-size: 13px; }
-.badge { padding: 2px 10px; border-radius: 10px; font-size: 11px; color: #fff; background: #f0ad4e; }
-.badge.success { background: #5cb85c; }
-.badge.fail { background: #d9534f; }
-.elapsed { font-size: 12px; color: #888; font-weight: normal; }
-.progress-bar { background: #e9ecef; border-radius: 6px; height: 18px; overflow: hidden; }
-.progress-fill { background: linear-gradient(90deg, #4a90d9, #5cb85c); height: 100%; transition: width .6s; }
-.progress-text { font-size: 12px; color: #666; margin: 6px 0 12px; }
-.nodes { font-size: 13px; }
-.node-details { border-bottom: 1px solid #f0f0f0; }
-.node-details:last-of-type { border: none; }
-.node-details.retry { padding-left: 16px; }
-.node-details.fail { color: #d9534f; }
-.node-details > summary { display: flex; align-items: center; gap: 12px; padding: 7px 0; cursor: pointer; list-style: none; }
-.node-details > summary::-webkit-details-marker { display: none; }
-.node-details[open] > summary { color: #4a90d9; }
-.seq { width: 24px; color: #999; text-align: center; }
-.skill { flex: 1; }
-.ok2 { color: #5cb85c; } .nok { color: #d9534f; }
-.ok { width: 18px; font-weight: bold; }
-.dur { color: #999; font-size: 11px; width: 70px; text-align: right; }
-.expand-hint { font-size: 10px; color: #aaa; width: 50px; }
-.node-body { padding: 4px 12px 12px 36px; color: #555; }
-.node-desc { margin: 0; line-height: 1.6; font-size: 12px; }
-.retry-tag { color: #e67e22; margin: 6px 0 0; font-size: 12px; }
-.spinner { width: 14px; height: 14px; border: 2px solid #e0e0e0; border-top-color: #4a90d9; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; margin-right: 4px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.running-pending { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: #4a90d9; }
-.bom-summary { display: flex; gap: 24px; flex-wrap: wrap; padding: 10px 14px; background: #f8f9fa; border-radius: 6px; margin-bottom: 14px; font-size: 14px; }
-details { margin: 8px 0; padding: 10px 14px; background: #fafbfc; border: 1px solid #eee; border-radius: 6px; }
-summary { cursor: pointer; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 10px; }
-summary::marker { color: #4a90d9; }
-.def { margin: 8px 0 0; line-height: 1.7; font-size: 14px; }
-ul { margin: 8px 0; padding-left: 20px; line-height: 1.8; font-size: 13px; }
-.profile div { margin: 8px 0; font-size: 13px; }
-.tags { color: #4a90d9; }
-.tags.conf { color: #e67e22; }
-pre { background: #f0f2f5; padding: 12px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; max-height: 360px; overflow: auto; font-size: 12px; margin-top: 10px; }
-</style>
