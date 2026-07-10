@@ -1,6 +1,7 @@
 <script setup>
 // 模型配置。设计见 §3.5 + 后端 GET/POST /config。
-// api_key 留空=不改；保存后清 LLM 客户端缓存。
+// api_key 留空=不改；保存后清 LLM 客户端缓存（温度立即生效）。
+// 3 个 stage 温度已接线到生成管线（client.get_temperature），调了真生效。
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { configApi } from '../api/config'
@@ -12,6 +13,22 @@ const cfg = reactive({
 const maskedKey = ref('')
 const loading = ref(true)
 const saving = ref(false)
+
+// 3 个 stage 的说明（hover 「?」展示）。温度越高越发散/有创意，越低越确定/一致。
+const stages = [
+  {
+    key: 'temperature_stage1', name: 'Stage1 · 定义规则', hint: '建议 0.1–0.3',
+    tip: '【定义+规则生成】让大模型生成语义定义 + 拦截/匹配/毒药词规则（BOM 核心产出）。\n• 0.1–0.3（推荐）：规则稳定、可复现\n• >0.5：表达多样但易跑偏、漏规则\n默认 0.2',
+  },
+  {
+    key: 'temperature_stage2', name: 'Stage2 · 召回画像', hint: '建议 0.4–0.7',
+    tip: '【召回画像组装】组装召回锚点：关键词 / 易混淆词 / 章节提示 / 语义查询。\n• 0.4–0.7（推荐）：适度发散，覆盖多样同义表达\n• 过低：召回窄，漏同义表达\n默认 0.5',
+  },
+  {
+    key: 'temperature_stage3', name: 'Stage3 · 自检', hint: '固定 0.0',
+    tip: '【自检】大模型走思维链自检 BOM：抓资金方向反 / 主体错位 / 毒药词误伤。\n• 固定 0.0（强烈建议）：要确定性、严格判定\n• 调高会让自检结论不稳定\n默认 0.0',
+  },
+]
 
 onMounted(async () => {
   try {
@@ -54,9 +71,24 @@ const save = async () => {
           <el-input v-model="cfg.api_key" type="password" :placeholder="maskedKey ? maskedKey + '（不改留空）' : '输入新 key'" />
           <div v-if="maskedKey" class="text-xs text-slate-400 mt-1">当前：{{ maskedKey }}</div>
         </el-form-item>
-        <el-form-item label="Stage1 温度"><el-input-number v-model="cfg.temperature_stage1" :min="0" :max="2" :step="0.1" /></el-form-item>
-        <el-form-item label="Stage2 温度"><el-input-number v-model="cfg.temperature_stage2" :min="0" :max="2" :step="0.1" /></el-form-item>
-        <el-form-item label="Stage3 温度"><el-input-number v-model="cfg.temperature_stage3" :min="0" :max="2" :step="0.1" /></el-form-item>
+
+        <el-divider content-position="left">
+          <span class="text-xs text-slate-400">生成管线温度（越高越发散，越低越确定）</span>
+        </el-divider>
+
+        <el-form-item v-for="s in stages" :key="s.key" :label="s.name">
+          <div class="flex items-center gap-2">
+            <el-input-number v-model="cfg[s.key]" :min="0" :max="2" :step="0.1" size="default" />
+            <el-tooltip placement="right" :width="360" effect="light">
+              <template #content>
+                <div class="text-xs leading-relaxed text-slate-700" style="white-space: pre-line">{{ s.tip }}</div>
+              </template>
+              <el-icon class="text-slate-400 cursor-help" style="opacity: 0.55"><QuestionFilled /></el-icon>
+            </el-tooltip>
+            <span class="text-xs text-slate-400">{{ s.hint }}</span>
+          </div>
+        </el-form-item>
+
         <el-form-item><el-button type="primary" :loading="saving" @click="save">保存配置</el-button></el-form-item>
       </el-form>
     </div>

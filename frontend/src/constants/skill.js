@@ -10,6 +10,18 @@ export const SKILL_NAMES = {
   PromptAssembleSkill:  '提示词组装',
 }
 
+// Skill 执行顺序（与后端 create_default_orchestrator 的 skills 列表一致）。
+// 用于执行中显示「当前第几步」：已完成 N 步 → 当前即第 N+1 步（SKILL_SEQUENCE[N]）。
+export const SKILL_SEQUENCE = [
+  'FeatureExtractSkill',
+  'ExampleRetrieveSkill',
+  'DefinitionRuleSkill',
+  'ProfileBuildSkill',
+  'RuleCheckSkill',
+  'SelfCheckSkill',
+  'PromptAssembleSkill',
+]
+
 export const skillName = (s) => SKILL_NAMES[s] || s
 
 // Skill 节点总数（后端 orchestrator 7 个；与 GET /runs 的 total_steps 一致）

@@ -68,7 +68,8 @@ const generate = async (row) => {
   try {
     const data = await generateApi.start({ block_code: row.block_code, clause: row.block_name })
     addPendingRun({ run_id: data.run_id, block_code: row.block_code, clause: row.block_name })
-    router.push({ path: '/runs', query: { block_code: row.block_code } })
+    // 跳任务列表（不带 block_code 筛选）：显示所有条款各自的最新一条，新生成的在顶部
+    router.push('/runs')
   } catch {}
 }
 </script>

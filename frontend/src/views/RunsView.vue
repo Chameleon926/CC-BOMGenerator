@@ -83,6 +83,9 @@ const clauseName = bc => clauseNames.value[bc] || bc
         <el-table-column label="创建时间" width="160">
           <template #default="{ row }">{{ row.started_at ? new Date(row.started_at).toLocaleString() : '—' }}</template>
         </el-table-column>
+        <el-table-column label="更新时间" width="160">
+          <template #default="{ row }">{{ row.finished_at ? new Date(row.finished_at).toLocaleString() : '—' }}</template>
+        </el-table-column>
         <el-table-column label="耗时" width="80" align="center">
           <template #default="{ row }">{{ row.duration_ms ? Math.round(row.duration_ms / 1000) + 's' : '—' }}</template>
         </el-table-column>

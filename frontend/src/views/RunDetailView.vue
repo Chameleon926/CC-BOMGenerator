@@ -79,7 +79,24 @@ const tagType = s => ({ success: 'success', fail: 'danger', cancelled: 'danger',
 
     <el-card v-if="statusData" shadow="never">
       <template #header><span class="text-sm font-semibold text-slate-600">执行进度</span></template>
-      <RunProgress :nodes="statusData.nodes || []" :running="phase === 'running'" />
+      <RunProgress :nodes="statusData.nodes || []" :running="phase === 'running'" :error-message="statusData.error_message || ''" />
+    </el-card>
+
+    <el-card v-if="!result?.bom && (result?.keywords?.length || result?.confusion_words?.length)" shadow="never">
+      <template #header>
+        <span class="text-sm font-semibold text-slate-600">关键词（Skill1 统计抽取）</span>
+        <span class="text-xs text-slate-400 ml-2">部分结果 · 定义/规则生成未完成</span>
+      </template>
+      <div class="space-y-1.5 text-sm">
+        <div><span class="text-slate-400">正向关键词：</span>
+          <el-tag v-for="w in result.keywords" :key="w" type="primary" effect="plain" size="small" class="mr-1 mb-0.5">{{ w }}</el-tag>
+          <span v-if="!result.keywords?.length" class="text-slate-300">—</span>
+        </div>
+        <div><span class="text-slate-400">易混淆词：</span>
+          <el-tag v-for="w in result.confusion_words" :key="w" type="warning" effect="plain" size="small" class="mr-1 mb-0.5">{{ w }}</el-tag>
+          <span v-if="!result.confusion_words?.length" class="text-slate-300">—</span>
+        </div>
+      </div>
     </el-card>
 
     <el-card v-if="result?.selected_examples?.length" shadow="never">
