@@ -103,7 +103,7 @@ class PipelineRun(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False, index=True)
     mode = Column(String(16), nullable=False, comment="generate/optimize")
-    run_status = Column(String(16), server_default="running", comment="running/success/fail")
+    run_status = Column(String(16), server_default="running", comment="running/success/fail/cancelled（见 enums.RunStatus）")
 
     input_cleaned_json = Column(JSON)
     output_bom_json = Column(JSON)

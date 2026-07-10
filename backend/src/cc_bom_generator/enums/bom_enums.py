@@ -24,10 +24,11 @@ class PipelineMode(str, Enum):
 
 
 class RunStatus(str, Enum):
-    """管线执行状态。"""
+    """管线执行状态（pipeline_runs.run_status 列的合法值，唯一事实源）。"""
     RUNNING = "running"
     SUCCESS = "success"
     FAIL = "fail"
+    CANCELLED = "cancelled"   # 用户 POST /runs/{id}/stop 标记；finish 守护保证不被覆盖
 
 
 class ModificationType(str, Enum):

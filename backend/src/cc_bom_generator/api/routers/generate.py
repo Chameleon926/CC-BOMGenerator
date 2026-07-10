@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from ..deps import get_db
 from ...db import session_scope, PipelineRepository
 from ...db.models import PipelineRun, NodeExecution
+from ...enums import RunStatus
 from ...logging_config import get_logger
 from ...nodes.orchestrator import create_default_orchestrator
 from ...schemas.generation_state import GenerationState
@@ -109,7 +110,7 @@ async def generate(
 
     return {
         "run_id": run_id,
-        "status": "running",
+        "status": RunStatus.RUNNING.value,
         "block_code": cleaned.block_code,
         "clause": cleaned.clause,
     }
@@ -172,9 +173,9 @@ def stop_run(run_id: int, db: Session = Depends(get_db)):
     run = db.get(PipelineRun, run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"run {run_id} 不存在")
-    if run.run_status != "running":
+    if run.run_status != RunStatus.RUNNING.value:
         raise HTTPException(status_code=400, detail=f"run {run_id} 状态 {run.run_status}，无法停止")
-    run.run_status = "cancelled"
+    run.run_status = RunStatus.CANCELLED.value
     run.finished_at = datetime.now()
     db.commit()
     return {"status": "ok", "run_id": run_id}

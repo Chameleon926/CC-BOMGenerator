@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from .models import (
     Clause, BomVersion, PipelineRun, NodeExecution, LlmCall, RuleModification,
 )
+from ..enums import RunStatus
 from ..logging_config import get_logger
 
 log = get_logger("db.repository")
@@ -48,7 +49,7 @@ class PipelineRepository:
         run = PipelineRun(
             block_code=block_code,
             mode=mode,
-            run_status="running",
+            run_status=RunStatus.RUNNING.value,
             input_cleaned_json=input_cleaned_json,
         )
         self.session.add(run)
@@ -60,7 +61,7 @@ class PipelineRepository:
     def finish_pipeline_run(
         self,
         run_id: int,
-        status: str = "success",
+        status: str = RunStatus.SUCCESS.value,
         output_bom_json: Optional[dict] = None,
         output_prompt_text: str = "",
         error_message: Optional[str] = None,
@@ -81,7 +82,7 @@ class PipelineRepository:
             .filter(PipelineRun.id == run_id)
             .scalar()
         )
-        if current_status == "cancelled":
+        if current_status == RunStatus.CANCELLED.value:
             log.info(f"pipeline_run {run_id} 已 cancelled，跳过 finish(status={status}) 不覆盖")
             return
 

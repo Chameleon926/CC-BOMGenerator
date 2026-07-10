@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
 
+from ..enums import RunStatus
 from ..logging_config import get_logger
 from ..schemas.generation_state import GenerationState
 from .base import BaseSkill
@@ -69,7 +70,7 @@ class GenerationOrchestrator:
                 # 每次生成/修改 BOM 后更新 pipeline_run 的 output 快照（仅 flush，不破坏外层事务）
                 if state.bom:
                     repo.finish_pipeline_run(
-                        run_id, status="running",
+                        run_id, status=RunStatus.RUNNING.value,
                         output_bom_json=state.bom.model_dump(mode="json"),
                     )
                     if self._commit_after_each:
@@ -85,7 +86,7 @@ class GenerationOrchestrator:
             raise
         finally:
             # ---- 写库：结束 pipeline_run ----
-            final_status = "fail" if error_msg else "success"
+            final_status = RunStatus.FAIL.value if error_msg else RunStatus.SUCCESS.value
             final_bom = state.bom.model_dump(mode="json") if state.bom else None
             final_prompt = state.full_prompt.prompt_text if state.full_prompt else ""
             repo.finish_pipeline_run(

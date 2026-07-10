@@ -61,6 +61,8 @@
 | 07-08 | 前端设计评审+补遗(B-0) | docs/frontend-design.md | 资深前端 agent 评审施工图，修 4 阻塞（§3.2 status 字段名 run_status→`status` / §5.2 删无端点重试 / block_code 来源 route.query / 轮询条件）+ 新增 §13 施工补遗（跨页状态约定/字段映射/组件 props 边界/迁移顺序依赖图/router mode/错误边界/api 模块更正） |
 | 07-08 | 前端 router 骨架(B-1) | frontend/src/(router/views/composables/constants)+main.js+App.vue | vue-router 3层IA骨架(4路由 createWebHistory)+App纯Shell(sidebar RouterLink+topbar+RouterView)+composables/useRunPoll(跨页 pendingRuns 单例+单run轮询 onUnmounted 清理)+constants/skill(SKILL_NAMES 去重)；vite build 通过 |
 | 07-08 | 前端 views 实现(B-2) | frontend/src/(views×4 + components/RunProgress+BomPreview + api/generate.js) | LibraryView(导入scan/新增/删除popconfirm/搜索/生成→任务列表) + RunsView(el-progress+状态tag+停止popconfirm/详情+轮询+合并pendingRuns) + RunDetailView(节点进度+选取数据selected_examples+BOM折叠+提示词复制+useRunPoll) + ConfigView；删死代码 GeneratePanel/ConfigPanel；api/generate 补 list+stop；vite build 通过 |
+| 07-10 | review 驱动改进 | 后端(generate/orchestrator/llm.client/3 logic) + 前端(RunProgress/RunDetailView/RunsView/LibraryView/ConfigView/constants/skill) | 列表每条款最新一条 + 失败返部分结果(selected_examples/keywords) + 温度配置接线(原硬编码 0.2/0.5/0.0 是摆设→client.get_temperature 真生效) + 失败节点 hover tooltip(可复制) + 执行中显示当前步骤名 + 更新时间列 + 生成不带回筛选 + ConfigView stage 说明/tooltips；24 测试过。LLM 配置 glm-5.2@bigmodel 跑通完整 success |
+| 07-10 | 架构夯实 AF-1 | enums/bom_enums.py + db/repository.py + nodes/orchestrator.py + api/routers/generate.py + db/models.py | RunStatus 加 CANCELLED；裸串 running/cancelled/success/fail 换 RunStatus.X.value（沿用 state.bom.source.value 约定）；models 列 comment 补 cancelled。import + 24 测试 + runtime(stop finished run→400) 全过。**改 enum 走铁律9（通知杨力）** |
 
 ### 阻塞
 - 暂无
