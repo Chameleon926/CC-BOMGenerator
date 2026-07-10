@@ -149,6 +149,13 @@ class GenerationOrchestrator:
                 output_snapshot["selected_examples"] = [
                     ex.model_dump(mode="json") for ex in state.selected_examples
                 ]
+            if state.keywords or state.confusion_words:
+                # Skill1 统计抽取的关键词/混淆词，落库供 result 在后续失败时也能展示部分结果
+                output_snapshot = output_snapshot or {}
+                if state.keywords:
+                    output_snapshot["keywords"] = [k for k in state.keywords if k.strip()]
+                if state.confusion_words:
+                    output_snapshot["confusion_words"] = [k for k in state.confusion_words if k.strip()]
             if state.verification:
                 output_snapshot = output_snapshot or {}
                 output_snapshot["verification_summary"] = state.verification.summary

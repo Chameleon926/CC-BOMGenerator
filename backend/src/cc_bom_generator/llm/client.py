@@ -49,6 +49,20 @@ def get_api_format() -> str:
     return _load_config().get("api_format", "openai")
 
 
+# 各 stage 的默认温度（与 /config 端点默认值一致）
+_STAGE_DEFAULTS = {"stage1": 0.2, "stage2": 0.5, "stage3": 0.0}
+
+
+def get_temperature(stage: str) -> float:
+    """读 config 的 temperature_stage{N}（fallback 到该 stage 默认值）。
+
+    stage1=定义+规则生成(0.2), stage2=召回画像组装(0.5), stage3=自检(0.0)。
+    /api/config 改完会 _clear_llm_cache()，下次调用读到新值。
+    """
+    default = _STAGE_DEFAULTS.get(stage, 0.3)
+    return float(_load_config().get(f"temperature_{stage}", default))
+
+
 def render_prompt(name: str, **kwargs: Any) -> str:
     """
     读 prompts/{name}.txt，填充 {{var}} 占位符。

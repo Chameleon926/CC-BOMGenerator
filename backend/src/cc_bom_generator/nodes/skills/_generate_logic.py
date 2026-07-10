@@ -16,7 +16,7 @@ from typing import List
 
 from ...schemas.bom import BOM, ExtractionRule, ExtractionRules, SceneJudgment, BomSource
 from ...schemas.cleaned_test_set import CleanedTestSet
-from ...llm.client import call_json, render_prompt
+from ...llm.client import call_json, render_prompt, get_temperature
 from ...logging_config import get_logger
 
 log = get_logger("nodes.skills._generate_logic")
@@ -63,7 +63,7 @@ def generate_definition_and_rules(
         {"role": "user", "content": user_prompt},
     ]
 
-    result = call_json(messages, temperature=0.2, max_retries=2)
+    result = call_json(messages, temperature=get_temperature("stage1"), max_retries=2)
 
     # ---- 解析结果，构建 BOM ----
     bom = BOM(

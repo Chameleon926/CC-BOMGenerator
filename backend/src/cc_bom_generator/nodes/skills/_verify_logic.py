@@ -23,7 +23,7 @@ from typing import List
 
 from ...schemas.bom import BOM
 from ...schemas.diagnosis import Verification
-from ...llm.client import call_json, render_prompt
+from ...llm.client import call_json, render_prompt, get_temperature
 
 
 def verify_bom(
@@ -72,7 +72,7 @@ def verify_bom(
     ]
 
     # ---- 调大模型（温度 0.0，最确定性）----
-    result = call_json(messages, temperature=0.0)
+    result = call_json(messages, temperature=get_temperature("stage3"))
 
     # ---- 解析结果 ----
     verification = Verification(

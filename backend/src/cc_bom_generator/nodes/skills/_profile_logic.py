@@ -28,7 +28,7 @@ from typing import List
 
 from ...schemas.bom import BOM, RecallProfile
 from ...schemas.cleaned_test_set import CleanedTestSet
-from ...llm.client import call_json, render_prompt
+from ...llm.client import call_json, render_prompt, get_temperature
 
 
 def build_profile(
@@ -89,7 +89,7 @@ def build_profile(
     ]
 
     # ---- 调大模型 ----
-    result = call_json(messages, temperature=0.5)
+    result = call_json(messages, temperature=get_temperature("stage2"))
     llm_profile = result.get("recall_profile", {})
 
     # ---- 融合：B1 统计结果 + 大模型结果 ----

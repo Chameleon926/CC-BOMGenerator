@@ -35,6 +35,14 @@ class GenerateResponse(BaseModel):
         default_factory=list,
         description="Skill2(ExampleRetrieve) 聚类选取的代表正例（含 doc_id 等行级字段，追溯用）",
     )
+    keywords: List[str] = Field(
+        default_factory=list,
+        description="Skill1(FeatureExtract) 统计抽取的正向关键词（后续节点失败时也能展示部分结果）",
+    )
+    confusion_words: List[str] = Field(
+        default_factory=list,
+        description="Skill1(FeatureExtract) 统计抽取的易混淆词",
+    )
 
 
 @router.get("/health")
@@ -122,12 +130,23 @@ def _bg_generate(run_id: int, state: GenerationState) -> None:
 
 @router.get("/runs")
 def list_runs(block_code: str = "", db: Session = Depends(get_db)):
-    """查生成任务列表（可按 block_code 筛选，含进度%）。"""
+    """查生成任务列表：每个条款只返回**最新一条 run**（GROUP BY max(id) 取最新创建/更新的）。
+
+    历史 run 留在 pipeline_runs 表（详情页 /runs/:id 仍可访问任意历史 run）。
+    block_code 可选筛选（筛选后仍只返该条款最新一条）。
+    """
+    from sqlalchemy import func
     TOTAL_STEPS = 7
-    q = db.query(PipelineRun)
+    # 每个条款取最新 run：max(id) 分组（id 自增 = 最新创建/更新）
+    latest_ids = db.query(func.max(PipelineRun.id)).group_by(PipelineRun.block_code)
     if block_code:
-        q = q.filter(PipelineRun.block_code == block_code)
-    runs = q.order_by(PipelineRun.id.desc()).all()
+        latest_ids = latest_ids.filter(PipelineRun.block_code == block_code)
+    runs = (
+        db.query(PipelineRun)
+        .filter(PipelineRun.id.in_(latest_ids))
+        .order_by(PipelineRun.id.desc())
+        .all()
+    )
     result = []
     for r in runs:
         done = db.query(NodeExecution).filter_by(pipeline_run_id=r.id, is_retry=False).count()
@@ -217,10 +236,24 @@ def run_result(run_id: int, db: Session = Depends(get_db)):
     selected: List[dict] = []
     if ex_node and ex_node.output_json:
         selected = ex_node.output_json.get("selected_examples") or []
+    # Skill1(FeatureExtract) 关键词/混淆词（失败时也能展示部分结果）
+    kw_node = (
+        db.query(NodeExecution)
+        .filter_by(pipeline_run_id=run_id, skill_name="FeatureExtractSkill", is_retry=False)
+        .order_by(NodeExecution.seq)
+        .first()
+    )
+    keywords: List[str] = []
+    confusion_words: List[str] = []
+    if kw_node and kw_node.output_json:
+        keywords = kw_node.output_json.get("keywords") or []
+        confusion_words = kw_node.output_json.get("confusion_words") or []
     return GenerateResponse(
         bom=run.output_bom_json or {},
         full_prompt={"prompt_text": run.output_prompt_text or ""},
         selected_examples=selected,
+        keywords=keywords,
+        confusion_words=confusion_words,
     )
 
 
