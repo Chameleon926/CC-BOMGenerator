@@ -6,6 +6,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api.routers.generate import router as generate_router
+from .api.routers.runs import router as runs_router
+from .api.routers.clauses import router as clauses_router
+from .api.routers.config import router as config_router
 
 
 def create_app() -> FastAPI:
@@ -24,5 +27,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 按资源拆分的 4 个 router（优化模块后加 tuning_router）
     app.include_router(generate_router, prefix="/api")
+    app.include_router(runs_router, prefix="/api")
+    app.include_router(clauses_router, prefix="/api")
+    app.include_router(config_router, prefix="/api")
     return app
