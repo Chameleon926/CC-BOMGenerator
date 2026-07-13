@@ -65,6 +65,7 @@
 | 07-10 | 架构夯实 AF-1 | enums/bom_enums.py + db/repository.py + nodes/orchestrator.py + api/routers/generate.py + db/models.py | RunStatus 加 CANCELLED；裸串 running/cancelled/success/fail 换 RunStatus.X.value（沿用 state.bom.source.value 约定）；models 列 comment 补 cancelled。import + 24 测试 + runtime(stop finished run→400) 全过。**改 enum 走铁律9（通知杨力）** |
 | 07-10 | 架构夯实 AF-2 | api/routers/(generate 拆薄 + 新建 runs/clauses/config) + app.py | 426 行 generate.py 按资源拆 4 router（generate:/generate+/health；runs:列表/停止/进度/结果+GenerateResponse；clauses:scan+CRUD；config:读写 llm.yaml）；散落函数内的 `from ...db.models import` 提到文件顶部；app.py 注册 4 个。import + 10 路由全注册 + 24 测试 + runtime(/api/clauses) 全过 |
 | 07-10 | 架构夯实 AF-3 | services/generate_service.py（删）+ db/repository.py + nodes/orchestrator.py | run_generate 是旧同步模式（无 run_id/async/commit_after_each），异步重构后零代码引用→删整个文件；修正 repository/orchestrator 的误导 docstring（原谎称 HTTP 走 generate_service 管 commit，实为 generate.py:_bg_generate+session_scope+commit_after_each）。async run 模式等 optimize 落地有 2 实现再抽共享（抽象判据）。import+24测试过 |
+| 07-10 | 架构夯实 AF-4 | errors.py（新）+ app.py + tests/test_errors.py（新）| 架构师版（带基类）：AppError 基类 + NotFound/ConcurrencyError/ClassifyFailed/DeltaConflict 子类；app.py 注册 `exception_handler(AppError)` 按 MRO 通吃所有子类，统一返 {detail=message(前端 .detail 兼容), code, context(可选)}。加新错误=加子类零改调用方/注册。现有 HTTPException 散抛不动，新代码（优化模块）用 AppError 子类。3 errors 测试 + 24 回归 + runtime health 全过 |
 
 ### 阻塞
 - 暂无
