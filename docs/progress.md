@@ -66,6 +66,7 @@
 | 07-10 | 架构夯实 AF-2 | api/routers/(generate 拆薄 + 新建 runs/clauses/config) + app.py | 426 行 generate.py 按资源拆 4 router（generate:/generate+/health；runs:列表/停止/进度/结果+GenerateResponse；clauses:scan+CRUD；config:读写 llm.yaml）；散落函数内的 `from ...db.models import` 提到文件顶部；app.py 注册 4 个。import + 10 路由全注册 + 24 测试 + runtime(/api/clauses) 全过 |
 | 07-10 | 架构夯实 AF-3 | services/generate_service.py（删）+ db/repository.py + nodes/orchestrator.py | run_generate 是旧同步模式（无 run_id/async/commit_after_each），异步重构后零代码引用→删整个文件；修正 repository/orchestrator 的误导 docstring（原谎称 HTTP 走 generate_service 管 commit，实为 generate.py:_bg_generate+session_scope+commit_after_each）。async run 模式等 optimize 落地有 2 实现再抽共享（抽象判据）。import+24测试过 |
 | 07-10 | 架构夯实 AF-4 | errors.py（新）+ app.py + tests/test_errors.py（新）| 架构师版（带基类）：AppError 基类 + NotFound/ConcurrencyError/ClassifyFailed/DeltaConflict 子类；app.py 注册 `exception_handler(AppError)` 按 MRO 通吃所有子类，统一返 {detail=message(前端 .detail 兼容), code, context(可选)}。加新错误=加子类零改调用方/注册。现有 HTTPException 散抛不动，新代码（优化模块）用 AppError 子类。3 errors 测试 + 24 回归 + runtime health 全过 |
+| 07-14 | 优化模块设计 spec 草稿 | docs/superpowers/specs/2026-07-14-optimization-module-design.md | brainstorm Q1(分类可插拔 Classifier：手填 issue_type+启发式判类，LLM 归因留插槽) / Q2(badcase 2 格式+case_type 派生+issue_type 自动判类) 敲定；Q3-Q7 提方案落 spec：badcase 导入→分类→optimize(pipeline_runs mode=optimize + OptimizeOrchestrator)→diff(render_diff 纯函数红删绿增)→apply(乐观锁+ConcurrencyError)；复用 07-01 BOMDelta/PendingDelta/apply_bom_delta；新增 IssueType 枚举/HeuristicClassifier/render_diff/优化任务 UI(独立 sidebar)。**待用户复核** |
 
 ### 阻塞
 - 暂无
