@@ -64,6 +64,7 @@
 | 07-10 | review 驱动改进 | 后端(generate/orchestrator/llm.client/3 logic) + 前端(RunProgress/RunDetailView/RunsView/LibraryView/ConfigView/constants/skill) | 列表每条款最新一条 + 失败返部分结果(selected_examples/keywords) + 温度配置接线(原硬编码 0.2/0.5/0.0 是摆设→client.get_temperature 真生效) + 失败节点 hover tooltip(可复制) + 执行中显示当前步骤名 + 更新时间列 + 生成不带回筛选 + ConfigView stage 说明/tooltips；24 测试过。LLM 配置 glm-5.2@bigmodel 跑通完整 success |
 | 07-10 | 架构夯实 AF-1 | enums/bom_enums.py + db/repository.py + nodes/orchestrator.py + api/routers/generate.py + db/models.py | RunStatus 加 CANCELLED；裸串 running/cancelled/success/fail 换 RunStatus.X.value（沿用 state.bom.source.value 约定）；models 列 comment 补 cancelled。import + 24 测试 + runtime(stop finished run→400) 全过。**改 enum 走铁律9（通知杨力）** |
 | 07-10 | 架构夯实 AF-2 | api/routers/(generate 拆薄 + 新建 runs/clauses/config) + app.py | 426 行 generate.py 按资源拆 4 router（generate:/generate+/health；runs:列表/停止/进度/结果+GenerateResponse；clauses:scan+CRUD；config:读写 llm.yaml）；散落函数内的 `from ...db.models import` 提到文件顶部；app.py 注册 4 个。import + 10 路由全注册 + 24 测试 + runtime(/api/clauses) 全过 |
+| 07-10 | 架构夯实 AF-3 | services/generate_service.py（删）+ db/repository.py + nodes/orchestrator.py | run_generate 是旧同步模式（无 run_id/async/commit_after_each），异步重构后零代码引用→删整个文件；修正 repository/orchestrator 的误导 docstring（原谎称 HTTP 走 generate_service 管 commit，实为 generate.py:_bg_generate+session_scope+commit_after_each）。async run 模式等 optimize 落地有 2 实现再抽共享（抽象判据）。import+24测试过 |
 
 ### 阻塞
 - 暂无

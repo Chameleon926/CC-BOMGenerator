@@ -3,7 +3,7 @@
 
 事务边界：run(state, repo) 接收外部注入的 PipelineRepository（共享 session）。
 orchestrator 只通过 repo 写库（repo 方法只 flush 不 commit），事务由调用层控制：
-  · HTTP 入口：services.generate_service 管 commit / rollback
+  · HTTP 异步入口：api/routers/generate.py 起 _bg_generate 线程，用 session_scope + commit_after_each
   · 非 HTTP 入口：nodes.pipeline.generate_bom 用 db.session_scope() 管 commit
 """
 

@@ -4,7 +4,7 @@
 设计要点（vs 旧 recorder.py 函数式）：
 - 构造注入 Session，所有方法共享同一个 session。
 - 方法内只 add/flush，**永不 commit/rollback/close** —— 事务边界由调用层控制：
-  · HTTP 入口：services.generate_service 用 FastAPI 注入的 session，成功 commit / 异常 rollback。
+  · HTTP 异步入口：api/routers/generate.py 同步 start_pipeline_run+commit 拿 run_id，后台 _bg_generate 线程用 session_scope + commit_after_each 跑剩余节点。
   · 非 HTTP 入口：nodes.pipeline.generate_bom 用 db.session_scope()（出块 commit / 异常 rollback）。
 - 一次管线 run = 一个 session = 一个事务：要么完整落库要么整体回滚，避免半残记录。
 """
