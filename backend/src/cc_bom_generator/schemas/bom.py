@@ -64,6 +64,16 @@ class RecallProfile(BaseModel):
     )
 
 
+class TypicalExample(BaseModel):
+    """典型正例 + 分析理由（进提示词【正向抽取示例】段）。
+
+    理由必须锚定 BOM 规则（引用匹配规则解释命中 + 确认不触发拦截/毒药词），
+    由 ExampleAnnotateSkill 生成 + 程序化一致性校验保证；用户可编辑。
+    """
+    value: str = Field(..., description="正例值")
+    reason: str = Field("", description="分析理由：为何命中（引用匹配规则）+ 不触发拦截")
+
+
 class BOM(BaseModel):
     clause: str = Field("", description="条款名称")
     block_code: str = Field("", description="语义块编码")
@@ -84,9 +94,13 @@ class BOM(BaseModel):
     scene_judgments: List[SceneJudgment] = Field(
         default_factory=list, description="判例分析（脱敏正反例 + 分析逻辑）"
     )
+    typical_examples: List[TypicalExample] = Field(
+        default_factory=list, description="典型正例+分析理由，进提示词【正向抽取示例】段（理由锚定 BOM 规则）"
+    )
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
 
 
 BOM.model_rebuild()
 ExtractionRules.model_rebuild()
 RecallProfile.model_rebuild()
+TypicalExample.model_rebuild()
