@@ -59,6 +59,39 @@ const copyPrompt = async () => {
   catch { ElMessage.error('复制失败') }
 }
 const tagType = s => ({ success: 'success', fail: 'danger', cancelled: 'danger', running: 'warning', queued: 'info' }[s] || 'info')
+
+// 典型正例编辑（TE-4：改 value/reason → 重 assemble 提示词）
+const teDialog = ref(false)
+const teForm = ref({ index: -1, value: '', reason: '' })
+const openTeEdit = (i) => {
+  const te = result.value?.bom?.typical_examples?.[i]
+  if (!te) return
+  teForm.value = { index: i, value: te.value || '', reason: te.reason || '' }
+  teDialog.value = true
+}
+const _putTypical = async (tes) => {
+  const bc = statusData.value?.block_code
+  if (!bc) { ElMessage.error('缺少 block_code'); throw new Error('no block_code') }
+  await clausesApi.updateTypicalExamples(bc, tes)
+}
+const saveTe = async () => {
+  const tes = [...(result.value?.bom?.typical_examples || [])]
+  if (teForm.value.index >= 0) tes[teForm.value.index] = { value: teForm.value.value, reason: teForm.value.reason }
+  try {
+    await _putTypical(tes)
+    ElMessage.success('已保存，提示词已重 assemble')
+    teDialog.value = false
+    result.value = await generateApi.result(props.id)  // 重取（bom+提示词已更新）
+  } catch {}
+}
+const deleteTe = async (i) => {
+  const tes = (result.value?.bom?.typical_examples || []).filter((_, idx) => idx !== i)
+  try {
+    await _putTypical(tes)
+    ElMessage.success('已删除')
+    result.value = await generateApi.result(props.id)
+  } catch {}
+}
 </script>
 
 <template>
@@ -111,6 +144,29 @@ const tagType = s => ({ success: 'success', fail: 'danger', cancelled: 'danger',
       </el-table>
     </el-card>
 
+    <el-card v-if="result?.bom?.typical_examples?.length" shadow="never">
+      <template #header>
+        <span class="text-sm font-semibold text-slate-600">典型正例（带分析理由·可编辑）</span>
+        <span class="text-xs text-slate-400 ml-2">进提示词【正向抽取示例】</span>
+      </template>
+      <div class="space-y-2">
+        <div v-for="(te, i) in result.bom.typical_examples" :key="i" class="border border-slate-200 rounded p-2.5">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex-1 min-w-0">
+              <div class="text-sm text-slate-700 whitespace-pre-wrap break-all">{{ te.value }}</div>
+              <div class="text-xs text-slate-600 mt-1.5 bg-slate-50 p-1.5 rounded leading-relaxed"><span class="text-slate-400">分析：</span>{{ te.reason || '（无）' }}</div>
+            </div>
+            <div class="flex-shrink-0 flex flex-col gap-1">
+              <el-button size="small" icon="EditPen" @click="openTeEdit(i)">编辑</el-button>
+              <el-popconfirm title="删除该典型正例？提示词会重 assemble。" width="240" @confirm="deleteTe(i)">
+                <template #reference><el-button size="small" type="danger" plain icon="Delete">删除</el-button></template>
+              </el-popconfirm>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-card>
+
     <el-card v-if="result?.bom" shadow="never">
       <template #header>
         <span class="text-sm font-semibold text-slate-600">BOM 结果 <span class="text-xs text-slate-400 ml-1" v-if="result.bom.version">v{{ result.bom.version }}</span></span>
@@ -127,5 +183,16 @@ const tagType = s => ({ success: 'success', fail: 'danger', cancelled: 'danger',
       </template>
       <pre class="text-xs leading-relaxed overflow-auto max-h-96 p-3 rounded font-mono" style="background:#0f172a;color:#e2e8f0">{{ result.full_prompt.prompt_text }}</pre>
     </el-card>
+
+    <el-dialog v-model="teDialog" title="编辑典型正例" width="640">
+      <el-form label-width="72px">
+        <el-form-item label="正例值"><el-input type="textarea" :rows="5" v-model="teForm.value" /></el-form-item>
+        <el-form-item label="分析理由"><el-input type="textarea" :rows="4" v-model="teForm.reason" placeholder="引用匹配规则解释命中 + 确认不触发拦截/毒药词" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="teDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveTe">保存（重 assemble 提示词）</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>

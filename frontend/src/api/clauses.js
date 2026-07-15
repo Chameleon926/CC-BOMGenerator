@@ -22,4 +22,8 @@ export const clausesApi = {
 
   /** 删条款 + 级联清理关联数据 */
   remove: (block_code) => api.delete(`/clauses/${block_code}`),
+
+  /** 编辑典型正例（value/reason）+ 重 assemble 提示词（TE-4） */
+  updateTypicalExamples: (block_code, typical_examples) =>
+    api.put(`/clauses/${block_code}/typical-examples`, { typical_examples }),
 }

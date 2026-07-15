@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from pydantic import BaseModel
@@ -14,6 +14,8 @@ from ..deps import get_db
 from ...db.models import (
     Clause, BomVersion, PipelineRun, NodeExecution, LlmCall, RuleModification,
 )
+from ...nodes.skills._prompt_logic import assemble_prompt
+from ...schemas.bom import BOM
 from ...services.ingest_service import scan_clauses
 
 router = APIRouter()
@@ -117,3 +119,50 @@ def delete_clause(block_code: str, db: Session = Depends(get_db)):
     db.delete(clause)
     db.commit()
     return {"status": "ok", "deleted": block_code}
+
+
+# ==================== 典型正例编辑（TE-4）====================
+
+class TypicalExampleItem(BaseModel):
+    value: str
+    reason: str = ""
+
+
+class TypicalExamplesUpdate(BaseModel):
+    typical_examples: List[TypicalExampleItem]
+
+
+@router.put("/clauses/{block_code}/typical-examples")
+def update_typical_examples(block_code: str, body: TypicalExamplesUpdate, db: Session = Depends(get_db)):
+    """编辑最新 bom_version 的典型正例（value/reason）+ 重 assemble 提示词。原地更新（不版本递增）。
+
+    同步更新关联 run（bom_version.pipeline_run_id）的输出快照，
+    让任务详情（读 run.output_bom_json/prompt）立刻反映编辑。
+    """
+    clause = db.query(Clause).filter_by(block_code=block_code).first()
+    if not clause:
+        raise HTTPException(status_code=404, detail=f"条款 {block_code} 不存在")
+    bom_ver = (
+        db.query(BomVersion)
+        .filter_by(block_code=block_code, version=clause.current_version)
+        .first()
+    )
+    if not bom_ver:
+        raise HTTPException(status_code=404, detail=f"条款 {block_code} 尚无 BOM，请先生成")
+
+    bom_dict = dict(bom_ver.full_bom_json or {})
+    bom_dict["typical_examples"] = [te.model_dump() for te in body.typical_examples]
+    bom = BOM.model_validate(bom_dict)
+    new_prompt = assemble_prompt(bom)
+    bom_ver.full_bom_json = bom.model_dump(mode="json")
+    bom_ver.prompt_text = new_prompt.prompt_text
+
+    # 同步关联 run 的输出快照（任务详情读 run.output_bom_json/prompt）
+    if bom_ver.pipeline_run_id:
+        run = db.get(PipelineRun, bom_ver.pipeline_run_id)
+        if run:
+            run.output_bom_json = bom_ver.full_bom_json
+            run.output_prompt_text = bom_ver.prompt_text
+
+    db.commit()
+    return {"status": "ok", "block_code": block_code, "version": clause.current_version, "count": len(body.typical_examples)}

@@ -71,6 +71,7 @@
 | 07-15 | 典型正例 TE-1 | schemas/bom.py + tests/test_bom_typical_examples.py | BOM 加 TypicalExample(value,reason) + typical_examples 字段（进提示词【正向抽取示例】，与召回锚点 positive_examples 分开）。3 测试+30 回归过。**BOM 契约变更，铁律9 通知杨力** |
 | 07-15 | 典型正例 TE-2 | nodes/skills/_example_annotate_logic.py + example_annotate.py + prompts/example_annotate.txt + tests/test_example_consistency.py | ExampleAnnotateSkill：LLM 为 selected_examples 生成锚定 BOM 规则的分析理由（引用匹配规则解释命中+确认不触发拦截/毒药词）→ typical_examples；程序化一致性校验 check_consistency（正例被拦截规则/毒药词命中→红旗、未被匹配规则/recall关键词覆盖→红旗，复用 rule_check._extract_rule_keywords）落日志。5 一致性测试 + 35 回归过。|
 | 07-15 | 典型正例 TE-3 | orchestrator.py + prompts/assemble.txt + _prompt_logic.py + api/routers/runs.py + frontend/constants/skill.js + example_annotate.txt/py | orchestrator 8 节点加 ExampleAnnotateSkill（skills+retry_skills，PromptAssemble 前）；assemble.txt 加【正向抽取示例】段（目标画像后，value+分析理由+使用规则）；_format_typical_examples；TOTAL_STEPS 7→8 + 前端 SKILL 映射/顺序/总数同步。修 example_annotate prompt 改返 {\"reasons\":[...]}（_parse_json 字典导向，裸数组会被剥 [] 失败；只返理由不回显长正例原文省 token），skill 用 values 配对。返利条款生成 success：8 节点全过，typical_examples 5 个带锚定匹配规则的理由，提示词含【正向抽取示例】+【示例使用规则】（8842 字符）。|
+| 07-15 | 典型正例 TE-4 | api/routers/clauses.py + frontend/api/clauses.js + views/RunDetailView.vue | PUT /clauses/{block_code}/typical-examples 编辑典型正例(value/reason)+重 assemble 提示词+同步关联 run 快照（原地不版本递增）；前端任务详情加典型正例卡（每条[编辑][删除]，编辑弹窗改正例值+分析理由，保存重 assemble）。E2E：编辑→reason 更新→提示词重 assemble 含编辑后理由。build 过。**典型正例特性 TE-1..4 完成** |
 
 ### 阻塞
 - 暂无
