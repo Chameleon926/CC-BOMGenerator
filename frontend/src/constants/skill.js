@@ -7,6 +7,7 @@ export const SKILL_NAMES = {
   ProfileBuildSkill:    '召回画像组装',
   RuleCheckSkill:       '规则校验',
   SelfCheckSkill:       '自检',
+  ExampleAnnotateSkill: '典型正例标注',
   PromptAssembleSkill:  '提示词组装',
 }
 
@@ -19,10 +20,11 @@ export const SKILL_SEQUENCE = [
   'ProfileBuildSkill',
   'RuleCheckSkill',
   'SelfCheckSkill',
+  'ExampleAnnotateSkill',
   'PromptAssembleSkill',
 ]
 
 export const skillName = (s) => SKILL_NAMES[s] || s
 
-// Skill 节点总数（后端 orchestrator 7 个；与 GET /runs 的 total_steps 一致）
-export const TOTAL_STEPS = 7
+// Skill 节点总数（后端 orchestrator 8 个；与 GET /runs 的 total_steps 一致）
+export const TOTAL_STEPS = 8

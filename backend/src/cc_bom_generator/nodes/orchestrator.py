@@ -278,8 +278,9 @@ class GenerationOrchestrator:
         from .skills.profile_build_skill import ProfileBuildSkill
         from .skills.rule_check import RuleCheckSkill
         from .skills.self_check import SelfCheckSkill
+        from .skills.example_annotate import ExampleAnnotateSkill
         from .skills.prompt_assemble_skill import PromptAssembleSkill
-        return [DefinitionRuleSkill(), ProfileBuildSkill(), RuleCheckSkill(), SelfCheckSkill(), PromptAssembleSkill()]
+        return [DefinitionRuleSkill(), ProfileBuildSkill(), RuleCheckSkill(), SelfCheckSkill(), ExampleAnnotateSkill(), PromptAssembleSkill()]
 
 
 def create_default_orchestrator() -> GenerationOrchestrator:
@@ -289,6 +290,7 @@ def create_default_orchestrator() -> GenerationOrchestrator:
     from .skills.profile_build_skill import ProfileBuildSkill
     from .skills.rule_check import RuleCheckSkill
     from .skills.self_check import SelfCheckSkill
+    from .skills.example_annotate import ExampleAnnotateSkill
     from .skills.prompt_assemble_skill import PromptAssembleSkill
 
     skills = [
@@ -298,6 +300,7 @@ def create_default_orchestrator() -> GenerationOrchestrator:
         ProfileBuildSkill(),
         RuleCheckSkill(),
         SelfCheckSkill(),
+        ExampleAnnotateSkill(),
         PromptAssembleSkill(),
     ]
     return GenerationOrchestrator(skills=skills, max_retries=1)

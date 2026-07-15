@@ -44,7 +44,7 @@ def list_runs(block_code: str = "", db: Session = Depends(get_db)):
     历史 run 留在 pipeline_runs 表（详情页 /runs/:id 仍可访问任意历史 run）。
     block_code 可选筛选（筛选后仍只返该条款最新一条）。
     """
-    TOTAL_STEPS = 7
+    TOTAL_STEPS = 8  # 8 个 Skill（含 ExampleAnnotate 典型正例标注）
     # 每个条款取最新 run：max(id) 分组（id 自增 = 最新创建/更新）
     latest_ids = db.query(func.max(PipelineRun.id)).group_by(PipelineRun.block_code)
     if block_code:

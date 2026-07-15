@@ -50,16 +50,18 @@ class ExampleAnnotateSkill(BaseSkill):
         messages = [{"role": "user", "content": user_prompt}]
         result = call_json(messages, temperature=self.temperature, max_retries=2)
 
-        # LLM 返回 [{value, reason}]（数组 或 {examples:[...]}）
-        items = result if isinstance(result, list) else (result.get("examples") or result.get("typical_examples") or [])
-        items = [it for it in items if isinstance(it, dict)]
-        vals = [str(it.get("value", "")).strip() for it in items]
-        reasons = [str(it.get("reason", "")).strip() for it in items]
-        # 兜底：LLM 漏返/空 → 退化用原 values + 空理由（仍跑一致性校验）
-        if not vals:
-            vals, reasons = list(values), [""] * len(values)
+        # LLM 返回 {"reasons": ["理由1", "理由2", ...]}（只返理由不回显原文，按顺序与 values 配对）
+        reasons_raw = result.get("reasons") if isinstance(result, dict) else None
+        if not isinstance(reasons_raw, list):
+            reasons_raw = []
+        reasons = [str(r).strip() for r in reasons_raw]
+        # 对齐到 values 长度（不足补空理由，超出截断）
+        if len(reasons) < len(values):
+            reasons = reasons + [""] * (len(values) - len(reasons))
+        else:
+            reasons = reasons[:len(values)]
 
-        typical, flags = annotate_typical_examples(vals, reasons, state.bom)
+        typical, flags = annotate_typical_examples(values, reasons, state.bom)
         state.bom.typical_examples = typical
         if flags:
             for f in flags:

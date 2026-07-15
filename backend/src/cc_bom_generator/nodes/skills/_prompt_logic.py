@@ -53,6 +53,7 @@ def assemble_prompt(bom: BOM) -> FullPrompt:
         confusion_words=_format_keywords(profile.confusion_words),
         section_hints=_format_keywords(profile.section_hints),
         semantic_queries=_format_semantic_queries(profile.semantic_queries),
+        typical_examples=_format_typical_examples(bom.typical_examples),
     )
 
     return FullPrompt(
@@ -157,3 +158,16 @@ def _format_semantic_queries(queries: list[str]) -> str:
     if not cleaned:
         return _PLACEHOLDER
     return "\n".join(f"  · {q}" for q in cleaned)
+
+
+def _format_typical_examples(examples) -> str:
+    """典型正例+理由：每条 `示例 N：value\\n分析：reason`，空 → （无）。"""
+    if not examples:
+        return _PLACEHOLDER
+    lines = []
+    for i, ex in enumerate(examples, 1):
+        lines.append(f"示例 {i}：{(ex.value or '').strip()}")
+        reason = (ex.reason or '').strip()
+        if reason:
+            lines.append(f"分析：{reason}")
+    return "\n".join(lines)
