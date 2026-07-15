@@ -69,6 +69,7 @@
 | 07-14 | 优化模块设计 spec 草稿 | docs/superpowers/specs/2026-07-14-optimization-module-design.md | brainstorm Q1(分类可插拔 Classifier：手填 issue_type+启发式判类，LLM 归因留插槽) / Q2(badcase 2 格式+case_type 派生+issue_type 自动判类) 敲定；Q3-Q7 提方案落 spec：badcase 导入→分类→optimize(pipeline_runs mode=optimize + OptimizeOrchestrator)→diff(render_diff 纯函数红删绿增)→apply(乐观锁+ConcurrencyError)；复用 07-01 BOMDelta/PendingDelta/apply_bom_delta；新增 IssueType 枚举/HeuristicClassifier/render_diff/优化任务 UI(独立 sidebar)。**待用户复核** |
 | 07-15 | 优化模块阶段1 实现计划 | docs/superpowers/plans/2026-07-15-optimization-phase1-badcase-import.md | writing-plans 产出 7 task TDD bite-sized：①IssueType 枚举 ②alembic 0005(badcases 加 issue_type/auto_judged/context_text + platform_run_id 改 nullable) ③badcase 解析纯函数(格式识别+case_type 派生) ④HeuristicClassifier(启发式判类) ⑤TuningRepository ⑥badcase_service(解析→取源BOM关键词→判类→落库) ⑦tuning 路由+冒烟。阶段2-4 各自后续计划。**待执行** |
 | 07-15 | 典型正例 TE-1 | schemas/bom.py + tests/test_bom_typical_examples.py | BOM 加 TypicalExample(value,reason) + typical_examples 字段（进提示词【正向抽取示例】，与召回锚点 positive_examples 分开）。3 测试+30 回归过。**BOM 契约变更，铁律9 通知杨力** |
+| 07-15 | 典型正例 TE-2 | nodes/skills/_example_annotate_logic.py + example_annotate.py + prompts/example_annotate.txt + tests/test_example_consistency.py | ExampleAnnotateSkill：LLM 为 selected_examples 生成锚定 BOM 规则的分析理由（引用匹配规则解释命中+确认不触发拦截/毒药词）→ typical_examples；程序化一致性校验 check_consistency（正例被拦截规则/毒药词命中→红旗、未被匹配规则/recall关键词覆盖→红旗，复用 rule_check._extract_rule_keywords）落日志。5 一致性测试 + 35 回归过。|
 
 ### 阻塞
 - 暂无
