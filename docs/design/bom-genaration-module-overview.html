@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>抽取评测平台模块 · 功能与集成</title>
+<style>
+  :root{--primary:#1E40AF;--primary-2:#3B82F6;--accent:#D97706;--ink:#0f172a;--ink-2:#334155;--muted:#64748b;--line:#e6e8ee;--bg:#fff;--surface:#f8fafc;--green:#059669;--green-bg:#ecfdf5;--amber:#d97706;--amber-bg:#fffbeb;--blue:#2563eb;--blue-bg:#eff6ff;--purple:#7c3aed;--purple-bg:#f5f3ff;--teal:#0d9488;--teal-bg:#ccfbf1}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
+  .deck{position:relative;width:100vw;height:100vh;overflow:hidden}
+  .slide{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;padding:4.5vh 7.5vw;background:var(--bg)}
+  .slide.active{display:flex;animation:fade .35s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .part{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--primary);margin-bottom:10px;text-transform:uppercase}
+  .part.b{color:var(--purple)}
+  h1{font-size:40px;line-height:1.2;letter-spacing:-.02em;font-weight:800;margin-bottom:14px}
+  h2{font-size:28px;line-height:1.25;letter-spacing:-.015em;font-weight:750;margin-bottom:6px}
+  h3{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--ink)}
+  .lead{font-size:16px;color:var(--muted);max-width:860px;margin-bottom:18px;line-height:1.6}
+  .small{font-size:12.5px;color:var(--muted)}
+  ul.big{list-style:none;margin-top:4px}
+  ul.big li{font-size:15px;line-height:1.55;margin-bottom:9px;padding-left:24px;position:relative;color:var(--ink-2)}
+  ul.big li::before{content:"";position:absolute;left:0;top:9px;width:11px;height:11px;border-radius:3px;background:var(--primary)}
+  ul.big li b{color:var(--ink)}
+  /* 目录 */
+  .toc{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+  .toc .tp{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;border-top:4px solid var(--primary)}
+  .toc .tp.b{border-top-color:var(--purple)}
+  .toc .tp .thead{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px}
+  .toc .tp.b .thead{color:var(--purple)}
+  .toc .tp h3{font-size:17px;margin-bottom:8px}
+  .toc .tp ol{padding-left:18px;font-size:14px;color:var(--ink-2);line-height:1.85}
+  /* pipeline */
+  .pipe{display:flex;align-items:stretch;gap:0;margin:8px 0;flex-wrap:wrap}
+  .pipe .node{flex:1;min-width:80px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 5px;text-align:center}
+  .pipe .node .seq{display:inline-block;background:var(--primary);color:#fff;width:18px;height:18px;border-radius:50%;font-size:10px;line-height:18px;margin-bottom:3px}
+  .pipe .node .nm{font-size:11px;font-weight:600;display:block;line-height:1.2}
+  .pipe .node .tag{font-size:9px;color:var(--accent);margin-top:2px}
+  .pipe .node .tag.gray{color:var(--muted)}
+  .pipe .node.opt{background:var(--purple-bg);border-color:#ddd6fe}
+  .pipe .node.opt .seq{background:var(--purple)}
+  .pipe .arr{display:flex;align-items:center;color:var(--muted);font-size:14px;padding:0 1px}
+  /* 依赖+输出 双栏 */
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+  .col-box{border-radius:12px;padding:16px;border:1px solid var(--line)}
+  .col-box.dep{background:var(--teal-bg);border-color:#99f6e4}
+  .col-box.out{background:var(--green-bg);border-color:#a7f3d0}
+  .col-box h4{font-size:14.5px;margin-bottom:7px}
+  .col-box.dep h4{color:var(--teal)} .col-box.out h4{color:var(--green)}
+  .col-box ul{list-style:none;font-size:12.5px;color:var(--ink-2);line-height:1.65}
+  .col-box ul li{padding-left:12px;position:relative}
+  .col-box ul li::before{content:"›";position:absolute;left:0;color:var(--muted)}
+  .col-box code{background:#fff;padding:1px 4px;border-radius:3px;font-size:11px;font-family:ui-monospace,monospace}
+  /* BOM 树 */
+  .bom-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;font-size:13px}
+  .bom-box .root{font-weight:700;color:var(--primary);margin-bottom:6px;font-size:14px}
+  .bom-box ul{list-style:none;padding-left:16px;border-left:2px dashed var(--line);margin-left:4px}
+  .bom-box li{padding:2px 0;position:relative;font-size:12.5px}
+  .bom-box li::before{content:"◆";color:var(--primary-2);position:absolute;left:-12px;font-size:8px}
+  .bom-box .fld{font-weight:600}
+  .bom-box .d{color:var(--muted)}
+  /* 对比表 */
+  .cmp-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  .cmp-tbl th{background:var(--surface);text-align:left;padding:8px 10px;border:1px solid var(--line);font-weight:600}
+  .cmp-tbl td{padding:8px 10px;border:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  .cmp-tbl td.sc1{background:var(--blue-bg)}.cmp-tbl td.sc2{background:var(--purple-bg)}
+  /* 集成架构 */
+  .arch{display:flex;align-items:stretch;gap:0;margin:8px 0}
+  .arch .layer{flex:1;border-radius:10px;padding:12px 8px;text-align:center;border:1px solid var(--line);background:#fff}
+  .arch .layer .ttl{font-size:12px;font-weight:700;margin-bottom:4px}
+  .arch .layer .sub{font-size:11px;color:var(--muted);line-height:1.45}
+  .arch .layer.lake{background:var(--blue-bg);border-color:#bfdbfe}.arch .layer.lake .ttl{color:var(--blue)}
+  .arch .layer.mod{background:var(--purple-bg);border-color:#ddd6fe}.arch .layer.mod .ttl{color:var(--purple)}
+  .arch .arr{display:flex;align-items:center;color:var(--muted);font-size:20px;padding:0 4px}
+  .io-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:8px 0}
+  .flow .step{background:#fff;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:11.5px}
+  .flow .step.lake{background:var(--blue-bg);border-color:#bfdbfe}.flow .step.mod{background:var(--purple-bg);border-color:#ddd6fe}
+  .flow .step b{color:var(--primary)}.flow .step.lake b{color:var(--blue)}.flow .step.mod b{color:var(--purple)}
+  .flow .arr{color:var(--muted);font-size:12px}
+  .phases{display:flex;gap:10px;margin-top:6px}
+  .phases .ph{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;border-top:4px solid var(--primary)}
+  .phases .ph .pn{font-size:11px;font-weight:700;color:var(--primary);margin-bottom:4px}
+  .phases .ph h4{font-size:13.5px;margin-bottom:5px}
+  .phases .ph div{font-size:12px;color:var(--ink-2);line-height:1.5}
+  .phases .ph.p1{border-top-color:var(--green)}.phases .ph.p1 .pn{color:var(--green)}
+  .phases .ph.p2{border-top-color:var(--amber)}.phases .ph.p2 .pn{color:var(--amber)}
+  .phases .ph.p3{border-top-color:var(--purple)}.phases .ph.p3 .pn{color:var(--purple)}
+  .callout{background:var(--blue-bg);border-left:3px solid var(--blue);padding:11px 15px;border-radius:0 8px 8px 0;margin:8px 0;font-size:13.5px}
+  .callout b{color:var(--blue)}
+  .nav{position:fixed;bottom:20px;right:24px;display:flex;align-items:center;gap:10px;z-index:99}
+  .nav button{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:16px;cursor:pointer;color:var(--ink-2);box-shadow:0 2px 8px rgba(15,23,42,.08)}
+  .nav button:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .counter{font-size:12.5px;color:var(--muted);font-weight:600;min-width:46px;text-align:center}
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--primary);transition:width .3s;z-index:99}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="deck" id="deck">
+
+  <!-- 1 封面 -->
+  <section class="slide active">
+    <h1>抽取评测平台模块</h1>
+    <p class="lead">合同条款抽取规则的「编译器 + 评测引擎」—— 把规则从手工艺变成可编译、可审计、可优化的工程产物。本文介绍两大功能场景与数据湖集成方案。</p>
+    <div class="small" style="margin-top:16px">语义 BOM 规则编译器 · 8 节点生成流水线 · badcase 驱动优化闭环 · PoC 52% → 72%</div>
+  </section>
+
+  <!-- 2 目录 -->
+  <section class="slide">
+    <div class="part">目录</div>
+    <h2>两部分：功能 + 集成</h2>
+    <div class="toc">
+      <div class="tp">
+        <div class="thead">第一部分</div>
+        <h3>功能与原理</h3>
+        <ol>
+          <li>场景一：基于测试集生成规则</li>
+          <li>场景一：节点流水线 + 预期输出</li>
+          <li>场景二：优化场景生成规则</li>
+          <li>场景二：节点 + 预期输出</li>
+          <li>两场景对比</li>
+        </ol>
+      </div>
+      <div class="tp b">
+        <div class="thead">第二部分</div>
+        <h3>数据湖集成方案</h3>
+        <ol>
+          <li>模块在湖里的定位</li>
+          <li>集成边界（输入 / 输出）</li>
+          <li>端到端数据流</li>
+          <li>接口契约 + 部署</li>
+          <li>分阶段集成路径</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 场景一：生成 概述 -->
+  <section class="slide">
+    <div class="part">第一部分 · 功能</div>
+    <h2>场景一：基于测试集生成规则</h2>
+    <p class="lead">输入一份标注测试集，自动生成该条款的完整抽取规则（语义 BOM）+ 可粘贴的提示词。<b>这是"从 0 到 1 产规则"的场景。</b></p>
+    <div class="two-col">
+      <div class="col-box dep">
+        <h4>⇲ 依赖（输入）</h4>
+        <ul>
+          <li><b>测试集</b>（Excel/CSV）：含 doc_id / block_code / expected_value（期望抽什么）</li>
+          <li><b>LLM</b>：api_key + model + base_url（4 个生成阶段调大模型）</li>
+          <li>无需 badcase、无需历史规则（从零生成）</li>
+        </ul>
+      </div>
+      <div class="col-box out">
+        <h4>⇱ 预期输出</h4>
+        <ul>
+          <li><b>语义 BOM</b>（结构化规则，见下页）</li>
+          <li><b>完整提示词</b>（粘抽取平台即用）</li>
+          <li><b>选取的代表正例</b>（带 doc_id，可追溯）</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><b>原理：</b>统计与大模型分工——能用程序解决的（关键词/正例选取/规则校验/组装）绝不用 LLM；LLM 只做语义推理（定义规则/画像/自检/正例理由），按阶段调温。自检发现问题自动回修一轮。</div>
+  </section>
+
+  <!-- 4 场景一：节点流水线 + BOM 输出 -->
+  <section class="slide">
+    <div class="part">第一部分 · 功能</div>
+    <h2>场景一：8 节点流水线 + BOM 产物</h2>
+    <div class="pipe">
+      <div class="node"><span class="seq">1</span><span class="nm">关键词抽取</span><span class="tag gray">统计</span></div><span class="arr">›</span>
+      <div class="node"><span class="seq">2</span><span class="nm">正例挑选</span><span class="tag gray">聚类</span></div><span class="arr">›</span>
+      <div class="node"><span class="seq">3</span><span class="nm">定义+规则</span><span class="tag">LLM</span></div><span class="arr">›</span>
+      <div class="node"><span class="seq">4</span><span class="nm">召回画像</span><span class="tag">LLM</span></div><span class="arr">›</span>
+      <div class="node"><span class="seq">5</span><span class="nm">规则校验</span><span class="tag gray">程序</span></div><span class="arr">›</span>
+      <div class="node"><span class="seq">6</span><span class="nm">自检</span><span class="tag">LLM</span></div><span class="arr">›</span>
+      <div class="node"><span class="seq">7</span><span class="nm">典型正例标注</span><span class="tag">LLM</span></div><span class="arr">›</span>
+      <div class="node"><span class="seq">8</span><span class="nm">提示词组装</span><span class="tag gray">模板</span></div>
+    </div>
+    <div class="bom-box" style="margin-top:10px">
+      <div class="root">📦 语义 BOM（产出的规则产物 · 版本化）</div>
+      <ul style="columns:2;column-gap:24px">
+        <li><span class="fld">语义定义</span> <span class="d">条款本质 + 排除说明</span></li>
+        <li><span class="fld">拦截规则</span> <span class="d">分场景，命中即弃（防误抽）</span></li>
+        <li><span class="fld">匹配规则</span> <span class="d">分场景，满足即取（防漏抽）</span></li>
+        <li><span class="fld">毒药词</span> <span class="d">一票否决</span></li>
+        <li><span class="fld">排雷思维链</span> <span class="d">抽取前推理步骤</span></li>
+        <li><span class="fld">召回画像</span> <span class="d">关键词/混淆词/章节/语义查询</span></li>
+        <li><span class="fld">典型正例+理由</span> <span class="d">进提示词，理由锚定规则</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 5 场景二：优化 概述 + 节点 + 输出 -->
+  <section class="slide">
+    <div class="part">第一部分 · 功能</div>
+    <h2>场景二：优化场景生成规则</h2>
+    <p class="lead">已有规则跑出 badcase（漏抽/误抽），导入后自动判类 + 针对性优化 + diff 对比，产出改进后的新版本。<b>这是"从 1 到更好"的场景。</b></p>
+    <div class="pipe">
+      <div class="node opt"><span class="seq">1</span><span class="nm">badcase 导入</span><span class="tag gray">解析</span></div><span class="arr">›</span>
+      <div class="node opt"><span class="seq">2</span><span class="nm">判类</span><span class="tag gray">启发式</span></div><span class="arr">›</span>
+      <div class="node opt"><span class="seq">3</span><span class="nm">改定义/规则</span><span class="tag">LLM</span></div><span class="arr">›</span>
+      <div class="node opt"><span class="seq">4</span><span class="nm">改召回画像</span><span class="tag">LLM</span></div><span class="arr">›</span>
+      <div class="node opt"><span class="seq">5</span><span class="nm">组装 Delta</span><span class="tag gray">程序</span></div><span class="arr">›</span>
+      <div class="node opt"><span class="seq">6</span><span class="nm">应用(人审)</span><span class="tag gray">合并</span></div>
+    </div>
+    <div class="two-col" style="margin-top:8px">
+      <div class="col-box dep">
+        <h4>⇲ 依赖（输入）</h4>
+        <ul>
+          <li><b>badcase 用例集</b>：期望值/实际值/相似度 + 问题类型（召回失败/抽取失败）</li>
+          <li><b>源 BOM</b>（待优化的基线版本）</li>
+          <li>LLM（两阶段优化调用）</li>
+        </ul>
+      </div>
+      <div class="col-box out">
+        <h4>⇱ 预期输出</h4>
+        <ul>
+          <li><b>优化后的 BOM</b>（新版本，bom_source=optimize）</li>
+          <li><b>BOMDelta diff</b>（红删绿增，改了啥一目了然）</li>
+          <li><b>regression_warnings</b>（防回归告警）</li>
+          <li>新提示词（重组装）</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><b>原理：</b>badcase 分两类路由——<b>召回失败</b>（关键词没覆盖→改画像）/ <b>抽取失败</b>（召回到了没识别→改规则）。两阶段 LLM 分别改，程序化过滤 + 人审应用防回归。</div>
+  </section>
+
+  <!-- 6 两场景对比 -->
+  <section class="slide">
+    <div class="part">第一部分 · 功能</div>
+    <h2>两场景对比</h2>
+    <table class="cmp-tbl">
+      <tr><th style="width:18%">维度</th><th style="width:41%">场景一：生成</th><th style="width:41%">场景二：优化</th></tr>
+      <tr><td><b>目标</b></td><td class="sc1">从 0 到 1 产规则</td><td class="sc2">从 1 到更好（改规则）</td></tr>
+      <tr><td><b>输入</b></td><td class="sc1">测试集（标注期望值）</td><td class="sc2">badcase + 源 BOM</td></tr>
+      <tr><td><b>核心依赖</b></td><td class="sc1">测试集 + LLM</td><td class="sc2">badcase + 源 BOM + LLM</td></tr>
+      <tr><td><b>节点数</b></td><td class="sc1">8 个（统计+LLM 流水线）</td><td class="sc2">6 个（判类+两阶段优化+应用）</td></tr>
+      <tr><td><b>产出</b></td><td class="sc1">完整 BOM + 提示词</td><td class="sc2">优化后 BOM + diff + 新提示词</td></tr>
+      <tr><td><b>触发</b></td><td class="sc1">新条款上线 / 重新生成</td><td class="sc2">跑分后发现 badcase</td></tr>
+    </table>
+    <div class="callout">两场景<b>共享 BOM 契约</b>（同一套结构化规则产物），优化基于生成的产出迭代——形成「生成 → 跑分 → 优化 → 再跑分」的闭环。</div>
+  </section>
+
+  <!-- 7 集成·定位 -->
+  <section class="slide">
+    <div class="part b">第二部分 · 集成方案</div>
+    <h2>模块在数据湖里的定位</h2>
+    <p class="lead">专注「规则」的编译与评测，与抽取引擎、质量校验解耦——各司其职。</p>
+    <div class="arch">
+      <div class="layer lake"><div class="ttl">数据湖 · 数据接入</div><div class="sub">合同 / 测试集 / 多模态数据</div></div>
+      <span class="arr">→</span>
+      <div class="layer mod"><div class="ttl">本模块 · 规则编译 + 评测</div><div class="sub">生成 BOM+提示词 / 优化闭环</div></div>
+      <span class="arr">→</span>
+      <div class="layer lake"><div class="ttl">数据湖 · Extraction</div><div class="sub">用提示词抽取合同</div></div>
+      <span class="arr">→</span>
+      <div class="layer lake"><div class="ttl">数据湖 · DQ 校验</div><div class="sub">独立组件，不消费本模块</div></div>
+    </div>
+    <ul class="big" style="margin-top:8px">
+      <li><b>只管规则</b>：产出 BOM + 提示词 + 评测，不直连抽取引擎（靠导入导出桥接）。</li>
+      <li><b>不管 DQ</b>：DQ 是湖侧独立组件；badcase 的 DQ 错例交湖，Extraction 错例进本模块优化。</li>
+    </ul>
+  </section>
+
+  <!-- 8 集成·边界 -->
+  <section class="slide">
+    <div class="part b">第二部分 · 集成方案</div>
+    <h2>集成边界：输入 / 输出</h2>
+    <div class="io-grid">
+      <div class="col-box dep">
+        <h4>⇲ 输入（数据湖 → 本模块）</h4>
+        <ul>
+          <li><b>测试集</b>：doc_id / block_code / expected_value（Excel）</li>
+          <li><b>合同原文</b>（可选）：抽取跑分用</li>
+          <li><b>badcase 跑分</b>：期望值/实际值/相似度（2 格式）</li>
+          <li><b>LLM 配置</b>：api_key / model / base_url</li>
+        </ul>
+      </div>
+      <div class="col-box out">
+        <h4>⇱ 输出（本模块 → 数据湖）</h4>
+        <ul>
+          <li><b>语义 BOM</b>（JSON）：完整结构化规则</li>
+          <li><b>提示词</b>（文本）：粘抽取平台</li>
+          <li><b>BOM 版本快照</b>：每次生成/优化一版</li>
+          <li><b>优化 diff</b> + 跑分评测结果</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><b>最小集成 = 文件导入导出（零侵入）</b>：上传 Excel → 下载 BOM+提示词 → 粘湖平台。无需改湖的抽取/DQ 代码。</div>
+  </section>
+
+  <!-- 9 集成·数据流 + 接口 -->
+  <section class="slide">
+    <div class="part b">第二部分 · 集成方案</div>
+    <h2>端到端数据流 + 接口</h2>
+    <div class="flow">
+      <span class="step lake"><b>湖</b> 测试集</span><span class="arr">→</span>
+      <span class="step mod"><b>模块</b> 生成BOM+提示词</span><span class="arr">→</span>
+      <span class="step lake"><b>湖</b> 抽取跑分</span><span class="arr">↺</span>
+      <span class="step lake"><b>湖</b> badcase</span><span class="arr">→</span>
+      <span class="step mod"><b>模块</b> 优化→diff</span><span class="arr">↻</span>
+      <span class="step lake"><b>湖</b> 用新规则重跑</span>
+    </div>
+    <h3 style="margin-top:10px">REST API（松耦合，JSON）</h3>
+    <table class="cmp-tbl">
+      <tr><th>入口</th><th>方法 + 路径</th><th>用途</th></tr>
+      <tr><td>生成环</td><td><code>POST /api/testset/scan</code> → <code>POST /api/generate</code> → <code>GET /api/runs/{id}/result</code></td><td>测试集 → BOM + 提示词</td></tr>
+      <tr><td>优化环</td><td><code>POST /api/tuning/badcases/import</code> → <code>POST /api/tuning/optimize</code> → <code>POST /api/tuning/apply/{delta}</code></td><td>badcase → 优化 → 新版本</td></tr>
+    </table>
+    <div class="small" style="margin-top:6px">BOM 产出是标准 JSON（Pydantic 契约），湖可解析消费或直接用提示词文本。独立 FastAPI 服务，docker-compose 一键起，不侵入湖。</div>
+  </section>
+
+  <!-- 10 集成·路径 + 价值 -->
+  <section class="slide">
+    <div class="part b">第二部分 · 集成方案</div>
+    <h2>分阶段集成路径</h2>
+    <div class="phases">
+      <div class="ph p1"><div class="pn">PHASE 1 · 立即可用</div><h4>文件桥接（零侵入）</h4><div>湖导出 Excel → 上传模块 → 下载 BOM+提示词 → 粘湖平台。<b>不改湖代码</b>，先跑通价值。</div></div>
+      <div class="ph p2"><div class="pn">PHASE 2 · 推荐目标</div><h4>API 直连</h4><div>湖直接调模块 API，规则自动回流。独立部署，松耦合，自动化。</div></div>
+      <div class="ph p3"><div class="pn">PHASE 3 · 可选</div><h4>嵌入式</h4><div>模块代码合入湖子目录，作为官方规则引擎子模块，共用 DB/鉴权。</div></div>
+    </div>
+    <div class="callout" style="margin-top:14px"><b>给数据湖的核心价值：</b>补一个「规则编译 + 评测」引擎——让抽取规则有<b>单一事实源</b>（可版本/审计/对比）+ <b>持续优化闭环</b>（badcase 驱动），与 Extraction / DQ 解耦。</div>
+  </section>
+
+</div>
+
+<div class="nav">
+  <button id="prev" title="上一页">‹</button>
+  <span class="counter" id="counter">1 / 10</span>
+  <button id="next" title="下一页">›</button>
+</div>
+
+<script>
+const slides=document.querySelectorAll('.slide');
+let i=0;
+function show(n){
+  i=Math.max(0,Math.min(slides.length-1,n));
+  slides.forEach((s,k)=>s.classList.toggle('active',k===i));
+  document.getElementById('counter').textContent=(i+1)+' / '+slides.length;
+  document.getElementById('progress').style.width=((i+1)/slides.length*100)+'%';
+}
+document.getElementById('next').onclick=()=>show(i+1);
+document.getElementById('prev').onclick=()=>show(i-1);
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')show(i+1);if(e.key==='ArrowLeft')show(i-1)});
+show(0);
+</script>
+</body>
+</html>
