@@ -125,15 +125,46 @@ def call_json(
                 raise ValueError(f"大模型输出无法解析为 JSON（重试 {max_retries} 次后仍失败）:\n{text[:500]}")
 
 
+# ==================== 内网代理/SSL ====================
+
+def _build_http_client(cfg: dict):
+    """根据 config 构建带 proxy/SSL 的 httpx.Client（内网代理/自签证书用）。返回 None = 默认。"""
+    import httpx
+    kwargs = {}
+    proxy = (cfg.get("proxy") or "").strip()
+    if proxy:
+        kwargs["proxy"] = proxy
+        log.info(f"LLM 走代理: {proxy}")
+    ssl_verify = cfg.get("ssl_verify", True)
+    if ssl_verify is False:
+        kwargs["verify"] = False
+        log.warning("⚠️ LLM SSL 验证已关闭（自签证书用，内网测试 OK，生产不推荐）")
+    elif isinstance(ssl_verify, str) and ssl_verify.strip() and ssl_verify.strip().lower() not in ("true", "1"):
+        kwargs["verify"] = ssl_verify.strip()
+        log.info(f"LLM 用自定义 CA 证书: {ssl_verify.strip()}")
+    return httpx.Client(**kwargs) if kwargs else None
+
+
+def _log_call_info(cfg: dict):
+    """打印 LLM 调用连接信息（排查代理/SSL/端点用）。"""
+    log.info(
+        f"LLM 调用 → format={cfg.get('api_format')}, model={cfg.get('model')}, "
+        f"base_url={cfg.get('base_url')}, proxy={cfg.get('proxy') or '无'}, "
+        f"ssl_verify={cfg.get('ssl_verify', True)}"
+    )
+
+
 # ==================== OpenAI 兼容 ====================
 
 def _call_openai(messages: list[dict], temperature: float) -> str:
     from openai import OpenAI
     cfg = _load_config()
-    client = OpenAI(
-        api_key=cfg.get("api_key", ""),
-        base_url=cfg.get("base_url") or None,
-    )
+    _log_call_info(cfg)
+    client_kwargs = dict(api_key=cfg.get("api_key", ""), base_url=cfg.get("base_url") or None)
+    _hc = _build_http_client(cfg)
+    if _hc:
+        client_kwargs["http_client"] = _hc
+    client = OpenAI(**client_kwargs)
     resp = client.chat.completions.create(
         model=cfg.get("model", "gpt-4o-mini"),
         messages=messages,
@@ -155,6 +186,7 @@ def _call_anthropic(messages: list[dict], temperature: float) -> str:
         raise ImportError("需要安装 anthropic SDK: pip install anthropic")
 
     cfg = _load_config()
+    _log_call_info(cfg)
 
     # 分离 system 消息和对话消息
     system_parts = []
@@ -165,10 +197,11 @@ def _call_anthropic(messages: list[dict], temperature: float) -> str:
         else:
             chat_messages.append({"role": msg["role"], "content": msg["content"]})
 
-    client = anthropic.Anthropic(
-        api_key=cfg.get("api_key", ""),
-        base_url=cfg.get("base_url"),
-    )
+    client_kwargs = dict(api_key=cfg.get("api_key", ""), base_url=cfg.get("base_url"))
+    _hc = _build_http_client(cfg)
+    if _hc:
+        client_kwargs["http_client"] = _hc
+    client = anthropic.Anthropic(**client_kwargs)
 
     resp = client.messages.create(
         model=cfg.get("model", "claude-sonnet-4-20250514"),
