@@ -142,9 +142,9 @@ def _build_http_client(cfg: dict):
     elif isinstance(ssl_verify, str) and ssl_verify.strip() and ssl_verify.strip().lower() not in ("true", "1"):
         kwargs["verify"] = ssl_verify.strip()
         log.info(f"LLM 用自定义 CA 证书: {ssl_verify.strip()}")
-    # 超时（LLM 慢，默认 300s = 5 分钟；config 可覆盖）
-    timeout = float(cfg.get("llm_timeout", 300))
-    kwargs["timeout"] = httpx.Timeout(timeout)
+    # 超时：默认 None = 不超时（流式输出已防断连）；config 可设秒数覆盖（如 llm_timeout: 600）
+    timeout = cfg.get("llm_timeout")
+    kwargs["timeout"] = httpx.Timeout(float(timeout)) if timeout else None
     return httpx.Client(**kwargs)
 
 
@@ -179,7 +179,10 @@ def _call_openai(messages: list[dict], temperature: float) -> str:
             text = ""
             for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
-                    text += chunk.choices[0].delta.content
+                    delta = chunk.choices[0].delta.content
+                    text += delta
+                    print(delta, end="", flush=True)  # 流式输出实时打印到终端
+            print()  # 换行
             if text:
                 return text
         except Exception as e:
@@ -233,6 +236,8 @@ def _call_anthropic(messages: list[dict], temperature: float) -> str:
             ) as stream:
                 for chunk in stream.text_stream:
                     text += chunk
+                    print(chunk, end="", flush=True)  # 流式输出实时打印到终端
+            print()  # 换行
             if text:
                 return text
         except Exception as e:
