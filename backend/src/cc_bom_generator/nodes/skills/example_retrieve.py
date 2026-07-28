@@ -18,7 +18,7 @@ class ExampleRetrieveSkill(BaseSkill):
         if rows:
             # 优先在全行上聚类（保留 doc_id），选出代表正例
             values = [r.expected_value for r in rows]
-            idxs = _select_diverse_indices(values, n=5)
+            idxs = _select_diverse_indices(values, n=state.num_examples)
             selected = [rows[i] for i in idxs]
             state.selected_examples = selected                       # 行结构（带 doc_id），result/追溯用
             state.selected_values = [r.expected_value for r in selected]  # 字符串，prompt 组装/校验用

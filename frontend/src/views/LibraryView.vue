@@ -64,11 +64,30 @@ const removeClause = async (block_code) => {
   try { await clausesApi.remove(block_code); ElMessage.success('已删除'); await refresh() } catch {}
 }
 
-const generate = async (row) => {
+// 生成配置弹窗（用户配正例数量 + 显示可用数 + 校验）
+const genDialog = ref(false)
+const genRow = ref(null)
+const genForm = ref({ num_examples: 5 })
+const openGenerate = (row) => {
+  genRow.value = row
+  genForm.value.num_examples = Math.min(5, row.positive_count || 5)
+  genDialog.value = true
+}
+const confirmGenerate = async () => {
+  const row = genRow.value
+  if (!row) return
+  const available = row.positive_count || 0
+  if (available > 0 && genForm.value.num_examples > available) {
+    ElMessage.warning(`测试集只有 ${available} 个正例，无法生成 ${genForm.value.num_examples} 个`)
+    return
+  }
   try {
-    const data = await generateApi.start({ block_code: row.block_code, clause: row.block_name })
+    const data = await generateApi.start({
+      block_code: row.block_code, clause: row.block_name,
+      num_examples: genForm.value.num_examples,
+    })
     addPendingRun({ run_id: data.run_id, block_code: row.block_code, clause: row.block_name })
-    // 跳任务列表（不带 block_code 筛选）：显示所有条款各自的最新一条，新生成的在顶部
+    genDialog.value = false
     router.push('/runs')
   } catch {}
 }
@@ -102,7 +121,7 @@ const generate = async (row) => {
         <el-table-column prop="source_file" label="来源" width="140" show-overflow-tooltip />
         <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" icon="Promotion" @click="generate(row)">生成</el-button>
+            <el-button type="primary" size="small" icon="Promotion" @click="openGenerate(row)">生成</el-button>
             <el-popconfirm title="确认删除？将级联清理该条款的所有 BOM / 运行记录。" width="260" @confirm="removeClause(row.block_code)">
               <template #reference><el-button type="danger" size="small" icon="Delete" plain>删除</el-button></template>
             </el-popconfirm>
@@ -120,6 +139,27 @@ const generate = async (row) => {
       <template #footer>
         <el-button @click="createDialog = false">取消</el-button>
         <el-button type="primary" :loading="creating" @click="submitCreate">新增</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 生成配置弹窗（正例数量可配 + 显示可用数 + 校验） -->
+    <el-dialog v-model="genDialog" title="生成 BOM" width="440">
+      <div class="text-sm text-slate-600 mb-3">
+        条款：<b>{{ genRow?.block_name || genRow?.block_code }}</b>
+        <span class="text-slate-400 ml-2">{{ genRow?.block_code }}</span>
+      </div>
+      <el-form label-width="90px">
+        <el-form-item label="正例数量">
+          <el-input-number v-model="genForm.num_examples" :min="1" :max="genRow?.positive_count || 99" />
+        </el-form-item>
+      </el-form>
+      <div class="text-xs text-slate-400 mt-1 ml-1 leading-relaxed">
+        测试集有 <b class="text-slate-600">{{ genRow?.positive_count || '?' }}</b> 个正例（去重后）。<br>
+        选取的正例用于：召回画像锚点 + 提示词【正向抽取示例】。
+      </div>
+      <template #footer>
+        <el-button @click="genDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmGenerate">生成</el-button>
       </template>
     </el-dialog>
   </div>

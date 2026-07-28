@@ -39,6 +39,7 @@ async def generate(
     nsec: int = Form(6, description="章节提示数量"),
     nq: int = Form(3, description="语义查询数量"),
     skip_verify: bool = Form(False, description="跳过自检"),
+    num_examples: int = Form(5, description="正例选取数量（典型正例数）"),
     db: Session = Depends(get_db),
 ):
     """上传测试集 → 异步启动生成 → 立即返回 run_id。
@@ -70,8 +71,17 @@ async def generate(
             tmp_path.unlink(missing_ok=True)
 
     # ---- 同步：创建 pipeline_run，拿 run_id（持久化后前端立即可查）----
+    # 校验：正例数量不能超过测试集可用正例数
+    num_available = len(cleaned.positive_values)
+    if num_examples > num_available and num_available > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"测试集只有 {num_available} 个正例（去重后），无法生成 {num_examples} 个典型正例。请将数量调整为 ≤ {num_available}。",
+        )
+
     state = GenerationState(
         cleaned=cleaned, nkw=nkw, nsec=nsec, nq=nq, skip_verify=skip_verify,
+        num_examples=num_examples,
     )
     repo = PipelineRepository(db)
     run_id = repo.start_pipeline_run(

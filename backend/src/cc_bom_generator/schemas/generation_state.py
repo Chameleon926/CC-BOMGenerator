@@ -19,6 +19,7 @@ class GenerationState(BaseModel):
     nkw: int = Field(10, description="关键词数量")
     nsec: int = Field(6, description="章节提示数量")
     nq: int = Field(3, description="语义查询数量")
+    num_examples: int = Field(5, description="正例选取数量（典型正例/召回锚点数）")
     skip_verify: bool = Field(False, description="跳过自检")
 
     # ---- Skill 1 (FeatureExtract) 产出 ----

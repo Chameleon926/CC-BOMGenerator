@@ -3,7 +3,7 @@ import api from './index'
 // 语义 BOM 生成 API
 export const generateApi = {
   /** 启动生成（file 可选，不传则用后端 latest.xlsx） */
-  start: ({ block_code, clause = '', file = null, nkw = 10, nsec = 6, nq = 3, skip_verify = false }) => {
+  start: ({ block_code, clause = '', file = null, nkw = 10, nsec = 6, nq = 3, skip_verify = false, num_examples = 5 }) => {
     const form = new FormData()
     if (file) form.append('file', file)
     form.append('block_code', block_code)
@@ -12,6 +12,7 @@ export const generateApi = {
     form.append('nsec', nsec)
     form.append('nq', nq)
     form.append('skip_verify', skip_verify)
+    form.append('num_examples', num_examples)
     return api.post('/generate', form)
   },
 
