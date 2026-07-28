@@ -7,7 +7,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { generateApi } from '../api/generate'
 import { clausesApi } from '../api/clauses'
-import { usePendingRuns, clearPendingRun } from '../composables/useRunPoll'
+import { usePendingRuns, clearPendingRun, addPendingRun } from '../composables/useRunPoll'
+import { formatDuration } from '../constants/skill'
 
 const route = useRoute()
 const router = useRouter()
@@ -58,6 +59,16 @@ const stop = async (run_id) => {
 const tagType = s => ({ queued: 'info', running: 'warning', success: 'success', fail: 'danger', cancelled: 'danger' }[s] || 'info')
 const tagText = s => ({ queued: '排队中', running: '执行中', success: '成功', fail: '失败', cancelled: '已取消' }[s] || s)
 const clauseName = bc => clauseNames.value[bc] || bc
+
+// 重试失败任务（新建一个 run）
+const retryGenerate = async (row) => {
+  try {
+    const data = await generateApi.start({ block_code: row.block_code })
+    addPendingRun({ run_id: data.run_id, block_code: row.block_code })
+    router.push(`/runs/${data.run_id}`)
+    ElMessage.success('已重新生成')
+  } catch {}
+}
 </script>
 
 <template>
@@ -86,12 +97,13 @@ const clauseName = bc => clauseNames.value[bc] || bc
         <el-table-column label="更新时间" width="160">
           <template #default="{ row }">{{ row.finished_at ? new Date(row.finished_at).toLocaleString() : '—' }}</template>
         </el-table-column>
-        <el-table-column label="耗时" width="80" align="center">
-          <template #default="{ row }">{{ row.duration_ms ? Math.round(row.duration_ms / 1000) + 's' : '—' }}</template>
+        <el-table-column label="耗时" width="90" align="center">
+          <template #default="{ row }">{{ formatDuration(row.duration_ms) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="150" align="center" fixed="right">
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="router.push(`/runs/${row.run_id}`)">详情</el-button>
+            <el-button v-if="row.status === 'fail'" size="small" type="warning" plain @click="retryGenerate(row)">重试</el-button>
             <el-popconfirm v-if="row.status === 'running'" title="确认停止？当前节点跑完后生效。" @confirm="stop(row.run_id)">
               <template #reference><el-button type="danger" size="small" plain>停止</el-button></template>
             </el-popconfirm>

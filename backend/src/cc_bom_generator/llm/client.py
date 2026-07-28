@@ -128,7 +128,7 @@ def call_json(
 # ==================== 内网代理/SSL ====================
 
 def _build_http_client(cfg: dict):
-    """根据 config 构建带 proxy/SSL 的 httpx.Client（内网代理/自签证书用）。返回 None = 默认。"""
+    """根据 config 构建 httpx.Client（proxy/SSL/timeout）。始终返回 Client。"""
     import httpx
     kwargs = {}
     proxy = (cfg.get("proxy") or "").strip()
@@ -142,7 +142,10 @@ def _build_http_client(cfg: dict):
     elif isinstance(ssl_verify, str) and ssl_verify.strip() and ssl_verify.strip().lower() not in ("true", "1"):
         kwargs["verify"] = ssl_verify.strip()
         log.info(f"LLM 用自定义 CA 证书: {ssl_verify.strip()}")
-    return httpx.Client(**kwargs) if kwargs else None
+    # 超时（LLM 慢，默认 300s = 5 分钟；config 可覆盖）
+    timeout = float(cfg.get("llm_timeout", 300))
+    kwargs["timeout"] = httpx.Timeout(timeout)
+    return httpx.Client(**kwargs)
 
 
 def _log_call_info(cfg: dict):
@@ -160,15 +163,30 @@ def _call_openai(messages: list[dict], temperature: float) -> str:
     from openai import OpenAI
     cfg = _load_config()
     _log_call_info(cfg)
-    client_kwargs = dict(api_key=cfg.get("api_key", ""), base_url=cfg.get("base_url") or None)
-    _hc = _build_http_client(cfg)
-    if _hc:
-        client_kwargs["http_client"] = _hc
-    client = OpenAI(**client_kwargs)
+    client = OpenAI(
+        api_key=cfg.get("api_key", ""),
+        base_url=cfg.get("base_url") or None,
+        http_client=_build_http_client(cfg),
+    )
+    model = cfg.get("model", "gpt-4o-mini")
+    use_stream = cfg.get("stream", True)
+    # 流式输出（防超时：持续接收 token 保持连接活跃）
+    if use_stream:
+        try:
+            stream = client.chat.completions.create(
+                model=model, messages=messages, temperature=temperature, stream=True,
+            )
+            text = ""
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    text += chunk.choices[0].delta.content
+            if text:
+                return text
+        except Exception as e:
+            log.warning(f"LLM 流式调用失败，退回非流式: {e}")
+    # 非流式（fallback 或 stream=False）
     resp = client.chat.completions.create(
-        model=cfg.get("model", "gpt-4o-mini"),
-        messages=messages,
-        temperature=temperature,
+        model=model, messages=messages, temperature=temperature,
     )
     return resp.choices[0].message.content or ""
 
@@ -197,20 +215,33 @@ def _call_anthropic(messages: list[dict], temperature: float) -> str:
         else:
             chat_messages.append({"role": msg["role"], "content": msg["content"]})
 
-    client_kwargs = dict(api_key=cfg.get("api_key", ""), base_url=cfg.get("base_url"))
-    _hc = _build_http_client(cfg)
-    if _hc:
-        client_kwargs["http_client"] = _hc
-    client = anthropic.Anthropic(**client_kwargs)
-
-    resp = client.messages.create(
-        model=cfg.get("model", "claude-sonnet-4-20250514"),
-        max_tokens=8192,
-        temperature=temperature,
-        system="\n\n".join(system_parts) if system_parts else None,
-        messages=chat_messages,
+    client = anthropic.Anthropic(
+        api_key=cfg.get("api_key", ""),
+        base_url=cfg.get("base_url"),
+        http_client=_build_http_client(cfg),
     )
-    # Anthropic 返回的是 content blocks
+    model = cfg.get("model", "claude-sonnet-4-20250514")
+    system = "\n\n".join(system_parts) if system_parts else None
+    use_stream = cfg.get("stream", True)
+    # 流式输出（防超时）
+    if use_stream:
+        try:
+            text = ""
+            with client.messages.stream(
+                model=model, max_tokens=8192, temperature=temperature,
+                system=system, messages=chat_messages,
+            ) as stream:
+                for chunk in stream.text_stream:
+                    text += chunk
+            if text:
+                return text
+        except Exception as e:
+            log.warning(f"LLM 流式调用失败，退回非流式: {e}")
+    # 非流式（fallback 或 stream=False）
+    resp = client.messages.create(
+        model=model, max_tokens=8192, temperature=temperature,
+        system=system, messages=chat_messages,
+    )
     return resp.content[0].text if resp.content else ""
 
 

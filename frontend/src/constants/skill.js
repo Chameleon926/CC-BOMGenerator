@@ -26,5 +26,19 @@ export const SKILL_SEQUENCE = [
 
 export const skillName = (s) => SKILL_NAMES[s] || s
 
+// 耗时格式化：ms → 自动 ms/s/m/h（598ms / 1.3s / 43.2s / 1m30s / 1h2m）
+export const formatDuration = (ms) => {
+  if (!ms || ms === 0) return '—'
+  if (ms < 1000) return ms + 'ms'
+  const s = ms / 1000
+  if (s < 60) return s.toFixed(1) + 's'
+  const m = Math.floor(s / 60)
+  const remS = Math.round(s % 60)
+  if (m < 60) return `${m}m${remS}s`
+  const h = Math.floor(m / 60)
+  const remM = m % 60
+  return `${h}h${remM}m`
+}
+
 // Skill 节点总数（后端 orchestrator 8 个；与 GET /runs 的 total_steps 一致）
 export const TOTAL_STEPS = 8

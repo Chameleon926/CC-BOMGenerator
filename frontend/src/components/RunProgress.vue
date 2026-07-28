@@ -5,7 +5,7 @@
 // - 执行中：按已完成步数推出当前步骤名（[N] 名称 ⟳），名称在前转圈在后。
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { skillName, SKILL_SEQUENCE } from '../constants/skill'
+import { skillName, SKILL_SEQUENCE, formatDuration } from '../constants/skill'
 
 const props = defineProps({
   nodes: { type: Array, default: () => [] },
@@ -47,7 +47,7 @@ const copyError = async () => {
         <CircleCheckFilled v-if="n.success" /><WarningFilled v-else />
       </el-icon>
 
-      <span class="text-slate-300 w-14 text-right tabular-nums">{{ n.duration_ms ? n.duration_ms + 'ms' : '—' }}</span>
+      <span class="text-slate-300 w-14 text-right tabular-nums">{{ formatDuration(n.duration_ms) }}</span>
     </div>
 
     <!-- 执行中：显示当前步骤名（按已完成数推出）+ 转圈 -->

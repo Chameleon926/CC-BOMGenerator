@@ -7,7 +7,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { generateApi } from '../api/generate'
 import { clausesApi } from '../api/clauses'
-import { useRunPoll } from '../composables/useRunPoll'
+import { useRunPoll, addPendingRun } from '../composables/useRunPoll'
+import { formatDuration } from '../constants/skill'
 import RunProgress from '../components/RunProgress.vue'
 import BomPreview from '../components/BomPreview.vue'
 
@@ -60,6 +61,18 @@ const copyPrompt = async () => {
 }
 const tagType = s => ({ success: 'success', fail: 'danger', cancelled: 'danger', running: 'warning', queued: 'info' }[s] || 'info')
 
+// 重试失败任务（新建一个 run）
+const retryGenerate = async () => {
+  const bc = statusData.value?.block_code
+  if (!bc) return
+  try {
+    const data = await generateApi.start({ block_code: bc })
+    addPendingRun({ run_id: data.run_id, block_code: bc })
+    router.push(`/runs/${data.run_id}`)
+    ElMessage.success('已重新生成')
+  } catch {}
+}
+
 // 典型正例编辑（TE-4：改 value/reason → 重 assemble 提示词）
 const teDialog = ref(false)
 const teForm = ref({ index: -1, value: '', reason: '' })
@@ -97,6 +110,7 @@ const deleteTe = async (i) => {
 <template>
   <div class="p-4 space-y-3 max-w-5xl">
     <el-button text icon="ArrowLeft" @click="router.push('/runs')">返回任务列表</el-button>
+    <el-button v-if="statusData?.status === 'fail'" type="warning" size="small" @click="retryGenerate">重试生成</el-button>
 
     <el-card v-if="statusData" shadow="never">
       <div class="flex items-center gap-4 text-sm flex-wrap">
@@ -104,7 +118,7 @@ const deleteTe = async (i) => {
         <el-tag :type="tagType(statusData.status)" size="small">{{ statusData.status }}</el-tag>
         <span class="text-slate-400">run_id: {{ id }}</span>
         <span class="text-slate-400" v-if="statusData.started_at">{{ new Date(statusData.started_at).toLocaleString() }}</span>
-        <span class="text-slate-400" v-if="statusData.duration_ms">· {{ Math.round(statusData.duration_ms / 1000) }}s</span>
+        <span class="text-slate-400" v-if="statusData.duration_ms">· {{ formatDuration(statusData.duration_ms) }}</span>
       </div>
     </el-card>
 
