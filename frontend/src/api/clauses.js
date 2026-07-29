@@ -26,4 +26,7 @@ export const clausesApi = {
   /** 编辑典型正例（value/reason）+ 重 assemble 提示词（TE-4） */
   updateTypicalExamples: (block_code, typical_examples) =>
     api.put(`/clauses/${block_code}/typical-examples`, { typical_examples }),
+
+  /** 预览条款正例数据（DB 存的，重部署不丢） */
+  getExamples: (block_code) => api.get(`/clauses/${block_code}/examples`),
 }

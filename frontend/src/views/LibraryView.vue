@@ -91,6 +91,15 @@ const confirmGenerate = async () => {
     router.push('/runs')
   } catch {}
 }
+
+// 正例预览（从 DB 读，重部署不丢）
+const previewDialog = ref(false)
+const previewData = ref(null)
+const openPreview = async (block_code) => {
+  previewDialog.value = true
+  previewData.value = null
+  try { previewData.value = await clausesApi.getExamples(block_code) } catch {}
+}
 </script>
 
 <template>
@@ -121,6 +130,7 @@ const confirmGenerate = async () => {
         <el-table-column prop="source_file" label="来源" width="140" show-overflow-tooltip />
         <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
+            <el-button size="small" @click="openPreview(row.block_code)">正例</el-button>
             <el-button type="primary" size="small" icon="Promotion" @click="openGenerate(row)">生成</el-button>
             <el-popconfirm title="确认删除？将级联清理该条款的所有 BOM / 运行记录。" width="260" @confirm="removeClause(row.block_code)">
               <template #reference><el-button type="danger" size="small" icon="Delete" plain>删除</el-button></template>
@@ -161,6 +171,30 @@ const confirmGenerate = async () => {
         <el-button @click="genDialog = false">取消</el-button>
         <el-button type="primary" @click="confirmGenerate">生成</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 正例预览弹窗（区分总用例 / 正例 / 负例） -->
+    <el-dialog v-model="previewDialog" :title="`正例预览 · ${previewData?.block_name || ''}`" width="720">
+      <div v-if="previewData" class="space-y-3">
+        <div class="flex gap-2 flex-wrap text-sm">
+          <el-tag>总用例 {{ previewData.total_count || 0 }}</el-tag>
+          <el-tag type="success">正例（有期望值）{{ previewData.positive_count || 0 }}</el-tag>
+          <el-tag type="info">负例（空，不应抽取）{{ (previewData.total_count || 0) - (previewData.positive_count || 0) }}</el-tag>
+          <el-tag type="warning" effect="plain">去重后 {{ previewData.count || 0 }}</el-tag>
+        </div>
+        <div class="text-xs text-slate-400 leading-relaxed">
+          <b>正例</b> = 该文档包含此条款（应抽取，用于生成 BOM）；<b>负例</b> = 该文档不含此条款（不应抽取，用于防误抽校验）。
+        </div>
+        <el-table :data="previewData.positive_examples" size="small" max-height="420">
+          <el-table-column label="文档ID" width="280">
+            <template #default="{ row }"><span class="font-mono text-xs text-slate-500">{{ row.doc_id || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column label="期望值（正例内容）">
+            <template #default="{ row }"><span class="text-sm text-slate-600 whitespace-pre-wrap">{{ row.expected_value }}</span></template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <div v-else class="text-center py-8 text-slate-400">加载中...</div>
     </el-dialog>
   </div>
 </template>

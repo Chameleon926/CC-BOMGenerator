@@ -47,7 +47,7 @@ async def testset_scan(file: UploadFile = File(..., description="测试集 Excel
         bc = c["block_code"]
         # 筛选该条款的行
         clause_df = df[df[block_code_col].astype(str).str.strip() == bc] if block_code_col else df
-        # 正例值（去重）
+        total_for_clause = len(clause_df)  # 总用例数（含空期望值的负例）
         values = [str(v).strip() for v in clause_df[expected_col] if str(v).strip()] if expected_col else []
         seen_v = set(); unique_values = []
         for v in values:
@@ -68,6 +68,7 @@ async def testset_scan(file: UploadFile = File(..., description="测试集 Excel
         existing = db.query(Clause).filter_by(block_code=bc).first()
         if existing:
             existing.positive_count = c["positive_count"]
+            existing.total_count = total_for_clause
             existing.source_file = file.filename
             existing.imported_at = now
             existing.positive_values_json = unique_values
@@ -77,7 +78,8 @@ async def testset_scan(file: UploadFile = File(..., description="测试集 Excel
         else:
             db.add(Clause(
                 block_code=bc, block_name=c["block_name"] or c["block_code"],
-                positive_count=c["positive_count"], source_file=file.filename, imported_at=now,
+                positive_count=c["positive_count"], total_count=total_for_clause,
+                source_file=file.filename, imported_at=now,
                 positive_values_json=unique_values, positive_examples_json=pos_examples,
             ))
     db.commit()
@@ -107,6 +109,8 @@ def get_examples(block_code: str, db: Session = Depends(get_db)):
         "block_name": clause.block_name,
         "positive_values": clause.positive_values_json or [],
         "positive_examples": clause.positive_examples_json or [],
+        "total_count": clause.total_count or 0,
+        "positive_count": clause.positive_count or 0,
         "count": len(clause.positive_values_json or []),
     }
 
