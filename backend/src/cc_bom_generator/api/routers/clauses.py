@@ -33,21 +33,52 @@ async def testset_scan(file: UploadFile = File(..., description="测试集 Excel
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"扫描失败: {e}")
     now = datetime.now()
+    # 解析每条款的正例数据（存 DB，防重部署丢 latest.xlsx）
+    import pandas as pd
+    from ...services.ingest_service import find_col
+    df = pd.read_excel(xlsx_path).fillna("")
+    expected_col = find_col(df, ["expected_value", "期望值", "期望结果"])
+    block_code_col = find_col(df, ["block_code", "语义块编码", "块/项编码", "条款编码"])
+    doc_id_col = find_col(df, ["doc_id", "文档id", "文档编号"])
+    item_code_col = find_col(df, ["item_code", "子项编码", "项编码"])
+    item_name_col = find_col(df, ["item_name", "子项名称", "项名称"])
+
     for c in clauses_list:
-        existing = db.query(Clause).filter_by(block_code=c["block_code"]).first()
+        bc = c["block_code"]
+        # 筛选该条款的行
+        clause_df = df[df[block_code_col].astype(str).str.strip() == bc] if block_code_col else df
+        # 正例值（去重）
+        values = [str(v).strip() for v in clause_df[expected_col] if str(v).strip()] if expected_col else []
+        seen_v = set(); unique_values = []
+        for v in values:
+            if v not in seen_v: seen_v.add(v); unique_values.append(v)
+        # 正例行（含 doc_id，精确去重）
+        pos_examples = []; seen_r = set()
+        for _, row in clause_df.iterrows():
+            ev = str(row[expected_col]).strip() if expected_col else ""
+            if not ev: continue
+            did = str(row[doc_id_col]).strip() if doc_id_col else ""
+            ic = str(row[item_code_col]).strip() if item_code_col else ""
+            inm = str(row[item_name_col]).strip() if item_name_col else ""
+            rk = (did, ev, ic, inm)
+            if rk in seen_r: continue
+            seen_r.add(rk)
+            pos_examples.append({"doc_id": did, "expected_value": ev, "item_code": ic, "item_name": inm})
+
+        existing = db.query(Clause).filter_by(block_code=bc).first()
         if existing:
             existing.positive_count = c["positive_count"]
             existing.source_file = file.filename
             existing.imported_at = now
+            existing.positive_values_json = unique_values
+            existing.positive_examples_json = pos_examples
             if not existing.block_name:
                 existing.block_name = c["block_name"] or c["block_code"]
         else:
             db.add(Clause(
-                block_code=c["block_code"],
-                block_name=c["block_name"] or c["block_code"],
-                positive_count=c["positive_count"],
-                source_file=file.filename,
-                imported_at=now,
+                block_code=bc, block_name=c["block_name"] or c["block_code"],
+                positive_count=c["positive_count"], source_file=file.filename, imported_at=now,
+                positive_values_json=unique_values, positive_examples_json=pos_examples,
             ))
     db.commit()
     return {"file_name": file.filename, "clause_count": len(clauses_list), "clauses": clauses_list}
@@ -63,6 +94,21 @@ def list_clauses(db: Session = Depends(get_db)):
          "source_file": r.source_file}
         for r in rows
     ]}
+
+
+@router.get("/clauses/{block_code}/examples")
+def get_examples(block_code: str, db: Session = Depends(get_db)):
+    """预览条款的正例数据（DB 存的，重部署不丢）。"""
+    clause = db.query(Clause).filter_by(block_code=block_code).first()
+    if not clause:
+        raise HTTPException(status_code=404, detail=f"条款 {block_code} 不存在")
+    return {
+        "block_code": block_code,
+        "block_name": clause.block_name,
+        "positive_values": clause.positive_values_json or [],
+        "positive_examples": clause.positive_examples_json or [],
+        "count": len(clause.positive_values_json or []),
+    }
 
 
 class ClauseCreate(BaseModel):

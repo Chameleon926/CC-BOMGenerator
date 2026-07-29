@@ -43,6 +43,8 @@ class Clause(Base):
     positive_count = Column(Integer, server_default="0", comment="用例数（scan 时写入）")
     source_file = Column(String(256), server_default="", comment="来源测试集文件名")
     imported_at = Column(DateTime, server_default=func.now(), comment="最近导入时间")
+    positive_values_json = Column(JSON, nullable=True, comment="正例值列表（去重），扫描时存入（防重部署丢数据）")
+    positive_examples_json = Column(JSON, nullable=True, comment="正例行（含doc_id等），扫描时存入")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

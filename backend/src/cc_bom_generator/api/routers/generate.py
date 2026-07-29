@@ -48,27 +48,38 @@ async def generate(
     成功后调 `GET /api/runs/{run_id}/result` 取 BOM + 提示词。
     file 可选：不传则用后端 data/uploads/latest.xlsx（scan 时存，刷新页面也能 generate）。
     """
-    # ---- 文件来源：新上传 or 后端存的 latest.xlsx ----
-    use_temp = False
+    # ---- 文件来源：新上传 → 解析文件 / 无文件 → 从 DB 读（防重部署丢 latest.xlsx）----
     if file and file.filename:
         suffix = Path(file.filename).suffix
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             content = await file.read()
             tmp.write(content)
         tmp_path = Path(tmp.name)
-        use_temp = True
-    else:
-        tmp_path = Path("data/uploads/latest.xlsx")
-        if not tmp_path.exists():
-            raise HTTPException(status_code=400, detail="未上传测试集，请先上传扫描")
-
-    try:
-        cleaned = parse_excel_to_cleaned(
-            tmp_path, clause=clause, block_code=block_code, domain=domain
-        )
-    finally:
-        if use_temp:
+        try:
+            cleaned = parse_excel_to_cleaned(
+                tmp_path, clause=clause, block_code=block_code, domain=domain
+            )
+        finally:
             tmp_path.unlink(missing_ok=True)
+    else:
+        # 无文件：优先从 DB 读正例数据（重部署不丢）
+        from ...db.models import Clause
+        from ...schemas.cleaned_test_set import CleanedTestSet, PositiveExample
+        clause_row = db.query(Clause).filter_by(block_code=block_code).first() if block_code else None
+        if clause_row and clause_row.positive_values_json:
+            cleaned = CleanedTestSet(
+                clause=clause or clause_row.block_name or clause_row.block_code,
+                block_code=clause_row.block_code,
+                domain=domain or clause_row.domain or "",
+                positive_values=clause_row.positive_values_json,
+                positive_examples=[PositiveExample(**r) for r in (clause_row.positive_examples_json or [])],
+            )
+        else:
+            # DB 没数据 → fallback 读 latest.xlsx
+            tmp_path = Path("data/uploads/latest.xlsx")
+            if not tmp_path.exists():
+                raise HTTPException(status_code=400, detail="未上传测试集，且数据库无该条款正例数据。请先导入测试集。")
+            cleaned = parse_excel_to_cleaned(tmp_path, clause=clause, block_code=block_code, domain=domain)
 
     # ---- 同步：创建 pipeline_run，拿 run_id（持久化后前端立即可查）----
     # 上限 20（每个正例要 LLM 写理由，太多超 token + 召回慢）
