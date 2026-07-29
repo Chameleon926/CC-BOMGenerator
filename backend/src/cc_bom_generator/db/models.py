@@ -240,7 +240,7 @@ class Badcase(Base):
     __tablename__ = "badcases"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    platform_run_id = Column(Integer, ForeignKey("platform_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform_run_id = Column(Integer, ForeignKey("platform_runs.id", ondelete="CASCADE"), nullable=True, index=True)
     block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False)
     doc_id = Column(String(128))
     case_type = Column(String(16), nullable=False, comment="miss/false_positive")
@@ -250,6 +250,9 @@ class Badcase(Base):
     segment_coverage = Column(Float, comment="单段覆盖率")
     reason = Column(String(256))
     trace_json = Column(JSON, nullable=True, comment="解析后的 StructuredTrace（无 trace 则 NULL）")
+    issue_type = Column(String(16), nullable=True, comment="召回失败/抽取失败（见 enums.IssueType）；NULL=未判")
+    auto_judged = Column(Boolean, server_default="0", comment="是否系统自动判类")
+    context_text = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 
