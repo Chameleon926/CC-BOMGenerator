@@ -42,11 +42,17 @@ export function useRunPoll(onUpdate, { interval = 2000, timeoutMs = 5 * 60 * 100
         onUpdate({ phase: 'running', statusData: data })
         if (TERMINAL.includes(data.status)) {
           stop()
-          if (data.status === 'success') {
-            try { onUpdate({ phase: 'done', statusData: data, result: await generateApi.result(run_id) }) }
-            catch { onUpdate({ phase: 'error', error: '结果拉取失败' }) }
-          } else {
-            onUpdate({ phase: 'error', error: data.error_message || `任务${data.status}` })
+          // 放宽：任何终态都拉 result（失败/取消也有部分结果：keywords/examples/bom快照）
+          try {
+            const result = await generateApi.result(run_id)
+            onUpdate({
+              phase: data.status === 'success' ? 'done' : 'error',
+              statusData: data,
+              result,
+              error: data.status !== 'success' ? (data.error_message || `任务${data.status}`) : undefined,
+            })
+          } catch {
+            onUpdate({ phase: 'error', statusData: data, error: data.error_message || `任务${data.status}` })
           }
         }
       } catch {

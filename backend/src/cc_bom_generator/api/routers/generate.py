@@ -71,6 +71,8 @@ async def generate(
             tmp_path.unlink(missing_ok=True)
 
     # ---- 同步：创建 pipeline_run，拿 run_id（持久化后前端立即可查）----
+    # 上限 20（每个正例要 LLM 写理由，太多超 token + 召回慢）
+    num_examples = min(num_examples, 20)
     # 校验：正例数量不能超过测试集可用正例数
     num_available = len(cleaned.positive_values)
     if num_examples > num_available and num_available > 0:

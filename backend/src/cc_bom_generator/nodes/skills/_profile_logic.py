@@ -105,12 +105,24 @@ def build_profile(
 
     # ---- 程序化关键词过滤（防过拟合兜底）----
     final_profile.positive_keywords = _sanitize_keywords(final_profile.positive_keywords)
+    # 按在正例中出现的频次排序（高频优先，确定性 > LLM 随意序）
+    final_profile.positive_keywords = _sort_by_frequency(
+        final_profile.positive_keywords, cleaned.positive_values
+    )
 
     bom.recall_profile = final_profile
     return bom
 
 
 # ==================== 内部函数 ====================
+
+def _sort_by_frequency(keywords: List[str], positive_values: List[str]) -> List[str]:
+    """按关键词在正例中出现的频次排序（高频在前）。确定性排序，不依赖 LLM 输出顺序。"""
+    if not keywords or not positive_values:
+        return keywords
+    freq = {kw: sum(1 for v in positive_values if kw and kw in v) for kw in keywords}
+    return sorted(keywords, key=lambda w: freq.get(w, 0), reverse=True)
+
 
 def _merge_profile(
     llm_profile: dict,
