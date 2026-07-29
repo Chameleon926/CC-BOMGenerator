@@ -10,6 +10,7 @@ from .api.routers.generate import router as generate_router
 from .api.routers.runs import router as runs_router
 from .api.routers.clauses import router as clauses_router
 from .api.routers.config import router as config_router
+from .api.routers.cases import router as cases_router
 from .errors import AppError
 
 
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(runs_router, prefix="/api")
     app.include_router(clauses_router, prefix="/api")
     app.include_router(config_router, prefix="/api")
+    app.include_router(cases_router, prefix="/api")
 
     # 领域异常统一转 HTTP：service 层抛 AppError 子类，handler 按 MRO 通吃。
     # 返回体 {detail(=message), code, context(可选)}，detail 与 FastAPI HTTPException 形状一致（前端拦截器读 .detail）。

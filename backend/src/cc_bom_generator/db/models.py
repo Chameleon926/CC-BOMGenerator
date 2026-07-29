@@ -193,18 +193,31 @@ class RuleModification(Base):
 
 
 class TestSetImport(Base):
-    """测试集导入追溯。"""
+    """测试集导入追溯（文件级，一次 Excel = 一条记录）。"""
     __tablename__ = "test_set_imports"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    block_code = Column(String(64), ForeignKey("clauses.block_code", ondelete="RESTRICT"), nullable=False)
     file_name = Column(String(256), nullable=False)
-    file_hash = Column(String(64), comment="MD5/SHA256，防重复导入")
-    original_count = Column(Integer)
-    after_dedup = Column(Integer)
-    domain = Column(String(32))
-    imported_by = Column(String(32), server_default="")
+    file_hash = Column(String(64), comment="SHA256，防重复导入")
+    total_cases = Column(Integer, server_default="0", comment="总用例数（含负例）")
+    positive_cases = Column(Integer, server_default="0", comment="正例数（有期望值）")
+    negative_cases = Column(Integer, server_default="0", comment="负例数（空期望值）")
+    clauses_count = Column(Integer, server_default="0", comment="覆盖条款数")
     imported_at = Column(DateTime, server_default=func.now())
+
+
+class TestCase(Base):
+    """测试集用例行（正例+负例都存）。"""
+    __tablename__ = "test_cases"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    test_set_id = Column(Integer, ForeignKey("test_set_imports.id", ondelete="CASCADE"), nullable=False, index=True)
+    block_code = Column(String(64), index=True)
+    doc_id = Column(String(128))
+    expected_value = Column(Text)
+    has_expected = Column(Boolean, comment="True=正例(有期望值) False=负例(空)")
+    row_data = Column(JSON, comment="原始行完整数据（保留 Excel 所有列）")
+    created_at = Column(DateTime, server_default=func.now())
 
 
 class PlatformRun(Base):

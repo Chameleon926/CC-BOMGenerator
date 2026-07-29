@@ -92,13 +92,9 @@ const confirmGenerate = async () => {
   } catch {}
 }
 
-// 正例预览（从 DB 读，重部署不丢）
-const previewDialog = ref(false)
-const previewData = ref(null)
-const openPreview = async (block_code) => {
-  previewDialog.value = true
-  previewData.value = null
-  try { previewData.value = await clausesApi.getExamples(block_code) } catch {}
+// 正例预览 → 跳用例库（按条款筛选）
+const openPreview = (block_code) => {
+  router.push({ path: '/cases', query: { block_code } })
 }
 </script>
 

@@ -6,6 +6,7 @@ import { RouterView, RouterLink, useRoute } from 'vue-router'
 const route = useRoute()
 const menuItems = [
   { to: '/library', label: '条款库', icon: 'Files' },
+  { to: '/cases', label: '用例库', icon: 'FolderOpened' },
   { to: '/runs', label: '生成任务', icon: 'List' },
   { to: '/config', label: '模型配置', icon: 'Setting' },
 ]

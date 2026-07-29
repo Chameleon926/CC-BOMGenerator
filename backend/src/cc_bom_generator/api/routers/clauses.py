@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..deps import get_db
 from ...db.models import (
     Clause, BomVersion, PipelineRun, NodeExecution, LlmCall, RuleModification,
+    TestSetImport, TestCase,
 )
 from ...nodes.skills._prompt_logic import assemble_prompt
 from ...schemas.bom import BOM
@@ -82,6 +83,42 @@ async def testset_scan(file: UploadFile = File(..., description="测试集 Excel
                 source_file=file.filename, imported_at=now,
                 positive_values_json=unique_values, positive_examples_json=pos_examples,
             ))
+    # ---- 用例库：创建 TestSetImport + TestCase（全部行存 DB，含负例）----
+    import hashlib
+    file_hash = hashlib.sha256(xlsx_path.read_bytes()).hexdigest()[:16]
+    existing_ts = db.query(TestSetImport).filter_by(file_hash=file_hash).first()
+    if existing_ts:
+        existing_ts.imported_at = now
+        ts_id = existing_ts.id
+    else:
+        ts = TestSetImport(file_name=file.filename, file_hash=file_hash)
+        db.add(ts)
+        db.flush()
+        ts_id = ts.id
+        total = 0; positive = 0; negative = 0; seen_blocks = set()
+        for _, row in df.iterrows():
+            total += 1
+            bc = str(row[block_code_col]).strip() if block_code_col else ""
+            if bc:
+                seen_blocks.add(bc)
+            ev = str(row[expected_col]).strip() if expected_col else ""
+            has_ev = bool(ev)
+            if has_ev:
+                positive += 1
+            else:
+                negative += 1
+            did = str(row[doc_id_col]).strip() if doc_id_col else ""
+            row_data = {str(col): str(row[col]) for col in df.columns if str(row[col]).strip()}
+            db.add(TestCase(
+                test_set_id=ts_id, block_code=bc, doc_id=did,
+                expected_value=ev if has_ev else "",
+                has_expected=has_ev, row_data=row_data,
+            ))
+        ts.total_cases = total
+        ts.positive_cases = positive
+        ts.negative_cases = negative
+        ts.clauses_count = len(seen_blocks)
+
     db.commit()
     return {"file_name": file.filename, "clause_count": len(clauses_list), "clauses": clauses_list}
 
