@@ -65,13 +65,18 @@ class RecallProfile(BaseModel):
 
 
 class TypicalExample(BaseModel):
-    """典型正例 + 分析理由（进提示词【正向抽取示例】段）。
-
-    理由必须锚定 BOM 规则（引用匹配规则解释命中 + 确认不触发拦截/毒药词），
-    由 ExampleAnnotateSkill 生成 + 程序化一致性校验保证；用户可编辑。
-    """
+    """典型正例 + 分析理由（进提示词【正向抽取示例】段，锚定匹配规则）。"""
     value: str = Field(..., description="正例值")
     reason: str = Field("", description="分析理由：为何命中（引用匹配规则）+ 不触发拦截")
+
+
+class InterceptionExample(BaseModel):
+    """典型反例（误抽内容）+ 分析理由（进提示词【反向拦截示例】段，锚定拦截规则）。
+
+    与 TypicalExample 对称：正例锚定匹配规则（为什么命中），反例锚定拦截规则/毒药词（为什么排除）。
+    """
+    value: str = Field(..., description="误抽内容（不应抽出但被抽了）")
+    reason: str = Field("", description="分析理由：为何排除（引用拦截规则/毒药词）")
 
 
 class BOM(BaseModel):
@@ -95,12 +100,16 @@ class BOM(BaseModel):
         default_factory=list, description="判例分析（脱敏正反例 + 分析逻辑）"
     )
     typical_examples: List[TypicalExample] = Field(
-        default_factory=list, description="典型正例+分析理由，进提示词【正向抽取示例】段（理由锚定 BOM 规则）"
+        default_factory=list, description="典型正例+分析理由，进提示词【正向抽取示例】段（锚定匹配规则）"
     )
-    created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
+    interception_examples: List[InterceptionExample] = Field(
+        default_factory=list, description="典型反例(误抽)+分析理由，进提示词【反向拦截示例】段（锚定拦截规则）"
+    )
+    created_at: datetime = Field(default_factory.now, description="创建时间")
 
 
 BOM.model_rebuild()
 ExtractionRules.model_rebuild()
 RecallProfile.model_rebuild()
 TypicalExample.model_rebuild()
+InterceptionExample.model_rebuild()

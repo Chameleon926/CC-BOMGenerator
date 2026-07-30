@@ -215,6 +215,7 @@ class TestCase(Base):
     block_code = Column(String(64), index=True)
     doc_id = Column(String(128))
     expected_value = Column(Text)
+    actual_value = Column(Text, nullable=True, comment="误抽值（用户填的：大模型实际误抽的内容）")
     has_expected = Column(Boolean, comment="True=正例(有期望值) False=负例(空)")
     row_data = Column(JSON, comment="原始行完整数据（保留 Excel 所有列）")
     created_at = Column(DateTime, server_default=func.now())
