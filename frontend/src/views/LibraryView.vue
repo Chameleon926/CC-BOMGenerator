@@ -124,13 +124,15 @@ const openPreview = (block_code) => {
           <template #default="{ row }">{{ row.current_version ? 'v' + row.current_version : '—' }}</template>
         </el-table-column>
         <el-table-column prop="source_file" label="来源" width="140" show-overflow-tooltip />
-        <el-table-column label="操作" width="170" align="center" fixed="right">
+        <el-table-column label="操作" width="230" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openPreview(row.block_code)">正例</el-button>
-            <el-button type="primary" size="small" icon="Promotion" @click="openGenerate(row)">生成</el-button>
-            <el-popconfirm title="确认删除？将级联清理该条款的所有 BOM / 运行记录。" width="260" @confirm="removeClause(row.block_code)">
-              <template #reference><el-button type="danger" size="small" icon="Delete" plain>删除</el-button></template>
-            </el-popconfirm>
+            <div class="flex items-center justify-center gap-1 nowrap">
+              <el-button size="small" @click="openPreview(row.block_code)">查看用例</el-button>
+              <el-button type="primary" size="small" icon="Promotion" @click="openGenerate(row)">生成</el-button>
+              <el-popconfirm title="确认删除？将级联清理该条款的所有 BOM / 运行记录。" width="260" @confirm="removeClause(row.block_code)">
+                <template #reference><el-button type="danger" size="small" icon="Delete" plain>删除</el-button></template>
+              </el-popconfirm>
+            </div>
           </template>
         </el-table-column>
       </el-table>
