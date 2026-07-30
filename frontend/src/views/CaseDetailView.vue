@@ -1,29 +1,24 @@
 <script setup>
-// 用例详情（完整用例行：保留原始列 + 正例/负例标注 + 按条款/正负例筛选）。
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+// 用例详情（某条款的用例行：正例/负例标注 + 正负例 tabs 筛选）。不搜其他条款。
+import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { casesApi } from '../api/cases'
 
-const props = defineProps({ id: { type: [String, Number], required: true } })
-const route = useRoute()
+const props = defineProps({ id: { type: String, required: true } })  // id = block_code
 const router = useRouter()
 
-const detail = ref(null)
+const blockName = ref('')
 const rows = ref([])
-const columns = ref([])        // 动态列名（从 row_data 提取）
+const columns = ref([])
 const loading = ref(false)
-const filterBlock = ref('')    // 按条款筛选
 const filterType = ref('all')  // all | positive | negative
 
 const loadRows = async () => {
   loading.value = true
   try {
-    const data = await casesApi.rows(props.id, {
-      block_code: filterBlock.value,
-      filter: filterType.value,
-    })
+    const data = await casesApi.rows(props.id, { filter: filterType.value })
     rows.value = data.rows || []
+    blockName.value = data.block_name || props.id
     // 提取动态列（从第一条 row_data）
     if (rows.value.length && !columns.value.length) {
       columns.value = Object.keys(rows.value[0].row_data)
@@ -31,52 +26,29 @@ const loadRows = async () => {
   } catch {} finally { loading.value = false }
 }
 
-onMounted(async () => {
-  try { detail.value = await casesApi.get(props.id) } catch {}
-  // 从条款库跳来 → 自动按 block_code 筛选
-  if (route.query.block_code) {
-    filterBlock.value = route.query.block_code
-  }
-  await loadRows()
-})
-
-watch([filterBlock, filterType], () => loadRows())
-
-const tagText = (s) => ({ all: '全部', positive: '正例', negative: '负例' }[s] || s)
+onMounted(loadRows)
+watch(filterType, loadRows)
 </script>
 
 <template>
   <div class="p-4 space-y-3">
     <el-button text icon="ArrowLeft" @click="router.push('/cases')">返回用例库</el-button>
 
-    <el-card v-if="detail" shadow="never">
+    <el-card shadow="never">
       <div class="flex items-center gap-4 text-sm flex-wrap">
-        <span class="text-base font-bold text-slate-800">{{ detail.file_name }}</span>
-        <el-tag>总用例 {{ detail.total_cases }}</el-tag>
-        <el-tag type="success">正例 {{ detail.positive_cases }}</el-tag>
-        <el-tag type="info">负例 {{ detail.negative_cases }}</el-tag>
-        <el-tag type="warning" effect="plain">覆盖条款 {{ detail.clauses_count }}</el-tag>
-        <span class="text-xs text-slate-400" v-if="detail.imported_at">{{ new Date(detail.imported_at).toLocaleString() }}</span>
+        <span class="text-base font-bold text-slate-800">{{ blockName }}</span>
+        <span class="text-slate-400">{{ id }}</span>
+        <el-radio-group v-model="filterType" size="small">
+          <el-radio-button value="all">全部</el-radio-button>
+          <el-radio-button value="positive">正例</el-radio-button>
+          <el-radio-button value="negative">负例</el-radio-button>
+        </el-radio-group>
+        <span class="text-xs text-slate-400">共 {{ rows.length }} 行</span>
       </div>
     </el-card>
 
-    <!-- 筛选 -->
-    <div class="flex items-center gap-3 flex-wrap">
-      <el-select v-model="filterBlock" placeholder="全部条款" clearable filterable style="width:240px">
-        <el-option v-for="bc in detail?.block_codes || []" :key="bc" :label="bc" :value="bc" />
-      </el-select>
-      <el-radio-group v-model="filterType">
-        <el-radio-button value="all">全部</el-radio-button>
-        <el-radio-button value="positive">正例</el-radio-button>
-        <el-radio-button value="negative">负例</el-radio-button>
-      </el-radio-group>
-      <span class="text-xs text-slate-400">共 {{ rows.length }} 行</span>
-    </div>
-
-    <!-- 用例表格（动态列 + 正例/负例标签） -->
     <el-card shadow="never" body-class="p-0" v-loading="loading">
-      <el-table :data="rows" height="500" size="small" empty-text="无数据">
-        <!-- 正例/负例标签列 -->
+      <el-table :data="rows" height="550" size="small" empty-text="无数据">
         <el-table-column label="类型" width="80" align="center" fixed>
           <template #default="{ row }">
             <el-tag :type="row.has_expected ? 'success' : 'info'" size="small">
@@ -84,8 +56,7 @@ const tagText = (s) => ({ all: '全部', positive: '正例', negative: '负例' 
             </el-tag>
           </template>
         </el-table-column>
-        <!-- 动态原始列 -->
-        <el-table-column v-for="col in columns" :key="col" :prop="`row_data.${col}`" :label="col" min-width="140" show-overflow-tooltip>
+        <el-table-column v-for="col in columns" :key="col" :label="col" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="text-xs text-slate-600 whitespace-pre-wrap">{{ row.row_data[col] || '—' }}</span>
           </template>

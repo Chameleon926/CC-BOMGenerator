@@ -14,7 +14,7 @@ const routes = [
   { path: '/runs', name: 'runs', component: RunsView, meta: { title: '生成任务' } },
   { path: '/runs/:id', name: 'run-detail', component: RunDetailView, props: true, meta: { title: '任务详情' } },
   { path: '/cases', name: 'cases', component: CasesView, meta: { title: '用例库' } },
-  { path: '/cases/:id', name: 'case-detail', component: CaseDetailView, props: true, meta: { title: '用例详情' } },
+  { path: '/cases/:id', name: 'case-detail', component: CaseDetailView, props: true, meta: { title: '用例详情' } },  // id = block_code
   { path: '/config', name: 'config', component: ConfigView, meta: { title: '模型配置' } },
 ]
 

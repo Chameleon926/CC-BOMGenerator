@@ -92,9 +92,9 @@ const confirmGenerate = async () => {
   } catch {}
 }
 
-// 正例预览 → 跳用例库（按条款筛选）
+// 正例预览 → 跳用例库该条款详情
 const openPreview = (block_code) => {
-  router.push({ path: '/cases', query: { block_code } })
+  router.push(`/cases/${block_code}`)
 }
 </script>
 
