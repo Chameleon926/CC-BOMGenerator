@@ -37,6 +37,7 @@ def build_profile(
     keywords: List[str] | None = None,
     confusion_words: List[str] | None = None,
     positive_examples: List[str] | None = None,
+    misextract_values: List[str] | None = None,
     nkw: int = 10,
     nsec: int = 6,
     nq: int = 3,
@@ -109,6 +110,13 @@ def build_profile(
     final_profile.positive_keywords = _sort_by_frequency(
         final_profile.positive_keywords, cleaned.positive_values
     )
+    # 从误抽内容提 confusion_words（排除正例中也有的，防漏召回）
+    if misextract_values:
+        import jieba as _jb
+        neg_words = set(w for v in misextract_values for w in _jb.lcut(v) if len(w) >= 2 and w not in STOPWORDS)
+        pos_words = set(w for v in cleaned.positive_values for w in _jb.lcut(v))
+        safe_confusion = [w for w in neg_words if w not in pos_words]
+        final_profile.confusion_words = list(dict.fromkeys(final_profile.confusion_words + safe_confusion))[:6]
 
     bom.recall_profile = final_profile
     return bom

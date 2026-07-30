@@ -24,6 +24,7 @@ class ProfileBuildSkill(BaseSkill):
             keywords=state.keywords,
             confusion_words=state.confusion_words,
             positive_examples=state.selected_values,
+            misextract_values=state.misextract_values or None,
             nkw=state.nkw,
             nsec=state.nsec,
             nq=state.nq,

@@ -105,7 +105,7 @@ class BOM(BaseModel):
     interception_examples: List[InterceptionExample] = Field(
         default_factory=list, description="典型反例(误抽)+分析理由，进提示词【反向拦截示例】段（锚定拦截规则）"
     )
-    created_at: datetime = Field(default_factory.now, description="创建时间")
+    created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
 
 
 BOM.model_rebuild()

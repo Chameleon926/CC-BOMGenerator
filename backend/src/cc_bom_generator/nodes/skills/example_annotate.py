@@ -46,16 +46,19 @@ class ExampleAnnotateSkill(BaseSkill):
             poison_words=_format_poison_words(rules.poison_words),
             match_rules=_format_match(rules.core_match_rules),
             selected_examples="\n".join(f"{i}. {v}" for i, v in enumerate(values, 1)),
+            misextract_section=(
+                f"\n【误抽内容（反例）】\n" + "\n".join(f"{i}. {v}" for i, v in enumerate(state.selected_misextract, 1))
+                if state.selected_misextract else ""
+            ),
         )
+        # ---- 正例标注（锚定匹配规则）----
         messages = [{"role": "user", "content": user_prompt}]
         result = call_json(messages, temperature=self.temperature, max_retries=2)
 
-        # LLM 返回 {"reasons": ["理由1", "理由2", ...]}（只返理由不回显原文，按顺序与 values 配对）
         reasons_raw = result.get("reasons") if isinstance(result, dict) else None
         if not isinstance(reasons_raw, list):
             reasons_raw = []
         reasons = [str(r).strip() for r in reasons_raw]
-        # 对齐到 values 长度（不足补空理由，超出截断）
         if len(reasons) < len(values):
             reasons = reasons + [""] * (len(values) - len(reasons))
         else:
@@ -63,9 +66,28 @@ class ExampleAnnotateSkill(BaseSkill):
 
         typical, flags = annotate_typical_examples(values, reasons, state.bom)
         state.bom.typical_examples = typical
+
+        # ---- 反例标注（锚定拦截规则/毒药词）----
+        interception = []
+        if state.selected_misextract:
+            neg_reasons_raw = result.get("negative_reasons") if isinstance(result, dict) else None
+            if not isinstance(neg_reasons_raw, list):
+                neg_reasons_raw = []
+            neg_reasons = [str(r).strip() for r in neg_reasons_raw]
+            mis_values = state.selected_misextract
+            if len(neg_reasons) < len(mis_values):
+                neg_reasons = neg_reasons + [""] * (len(mis_values) - len(neg_reasons))
+            else:
+                neg_reasons = neg_reasons[:len(mis_values)]
+            from ._example_annotate_logic import annotate_interception_examples
+            interception, neg_flags = annotate_interception_examples(mis_values, neg_reasons, state.bom)
+            flags.extend(neg_flags)
+
+        state.bom.interception_examples = interception
+
         if flags:
             for f in flags:
-                log.warning(f"[典型正例一致性红旗] {f}")
-            print(f"  [{self.name}] ⚠️ {len(flags)} 条一致性红旗（见日志，提示 BOM 拦截过宽/匹配过窄）")
-        print(f"  [{self.name}] 标注 {len(typical)} 个典型正例（带分析理由）")
+                log.warning(f"[示例一致性红旗] {f}")
+            print(f"  [{self.name}] ⚠️ {len(flags)} 条一致性红旗（见日志）")
+        print(f"  [{self.name}] 标注 {len(typical)} 个正例 + {len(interception)} 个反例（带分析理由）")
         return state

@@ -26,6 +26,7 @@ def generate_definition_and_rules(
     cleaned: CleanedTestSet,
     keywords: List[str] | None = None,
     current_bom: str = "（无）",
+    misextract: List[str] | None = None,
 ) -> BOM:
     """
     调大模型生成语义定义 + 精细抽取规则 + 思维链 + 判例分析。
@@ -42,6 +43,13 @@ def generate_definition_and_rules(
     # ---- 组装候选正例文本 ----
     cands_text = _format_candidates(cleaned.positive_values)
 
+    # ---- 组装误抽内容（反例，引导 LLM 写更严的规则）----
+    if misextract:
+        misextract_text = "\n".join(f"误抽案例 {i}: {v}" for i, v in enumerate(misextract[:5], 1))
+        misextract_text += "\n\n生成规则时必须确保：1. 拦截规则能拦住这些内容 2. 毒药词包含这些内容的特征词 3. 匹配规则不会匹配这些内容"
+    else:
+        misextract_text = "（无误抽案例）"
+
     # 如果有关键词，附在候选正例后面作为辅助参考
     if keywords:
         cands_text += f"\n\n（统计抽取的高频特征词参考：{'、'.join(keywords)}）"
@@ -54,6 +62,7 @@ def generate_definition_and_rules(
         current_bom=current_bom,
         cands=cands_text,
         few_shot=few_shot,
+        misextract_text=misextract_text,
     )
 
     # ---- 调大模型（retry=2，防 JSON 损坏）----

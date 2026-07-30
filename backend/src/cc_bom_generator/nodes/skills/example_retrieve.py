@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..base import BaseSkill
-from ._keyword_logic import _select_diverse, _select_diverse_indices
+from ._keyword_logic import _select_diverse, _select_diverse_indices, select_prompt_misextract
 from ...schemas.generation_state import GenerationState
 
 
@@ -31,4 +31,20 @@ class ExampleRetrieveSkill(BaseSkill):
             f"  [{self.name}] 选出 {len(state.selected_values)} 个代表性正例"
             f"（带 doc_id 行: {len(state.selected_examples)}）"
         )
+
+        # ---- 反例选取（误抽值去重 + 相似度排序 + TOP N）----
+        if state.misextract_values:
+            state.selected_misextract = select_prompt_misextract(
+                state.misextract_values,
+                state.cleaned.positive_values,
+                cap=state.num_interception_examples,
+            )
+            print(
+                f"  [{self.name}] 选取 {len(state.selected_misextract)} 个反例进提示词"
+                f"（去重后 {len(set(state.misextract_values))} 条，取 TOP {state.num_interception_examples}）"
+            )
+        else:
+            state.selected_misextract = []
+            print(f"  [{self.name}] 无误抽值，跳过反例选取")
+
         return state

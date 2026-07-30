@@ -19,7 +19,9 @@ class GenerationState(BaseModel):
     nkw: int = Field(10, description="关键词数量")
     nsec: int = Field(6, description="章节提示数量")
     nq: int = Field(3, description="语义查询数量")
-    num_examples: int = Field(5, description="正例选取数量（典型正例/召回锚点数）")
+    num_examples: int = Field(5, description="召回正例选取数量（召回锚点）")
+    num_prompt_examples: int = Field(5, description="提示词正向示例数（≤召回正例数）")
+    num_interception_examples: int = Field(5, description="提示词反向示例数上限")
     skip_verify: bool = Field(False, description="跳过自检")
 
     # ---- Skill 1 (FeatureExtract) 产出 ----
@@ -32,6 +34,10 @@ class GenerationState(BaseModel):
     # CleanedTestSet.positive_examples(行) 同名异类型混淆。
     selected_values: List[str] = Field(default_factory=list, description="Skill2 聚类选取代表正例的期望值字符串（prompt 组装/校验用）")
     selected_examples: List[PositiveExample] = Field(default_factory=list, description="Skill2 聚类选取的代表正例（带 doc_id 行结构，result/追溯用）")
+
+    # ---- Skill 2 反例选取产出（误抽值，从 test_cases 查 actual_value）----
+    misextract_values: List[str] = Field(default_factory=list, description="用户填的误抽值（从 test_cases.actual_value 查）")
+    selected_misextract: List[str] = Field(default_factory=list, description="Skill2 选取的进提示词反例（去重+相似度排序后 TOP N）")
 
     # ---- Skill 3 (DefinitionRule) 产出 ----
     bom: Optional[BOM] = Field(None, description="语义 BOM（逐步填充）")

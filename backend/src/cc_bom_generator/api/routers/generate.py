@@ -39,7 +39,9 @@ async def generate(
     nsec: int = Form(6, description="章节提示数量"),
     nq: int = Form(3, description="语义查询数量"),
     skip_verify: bool = Form(False, description="跳过自检"),
-    num_examples: int = Form(5, description="正例选取数量（典型正例数）"),
+    num_examples: int = Form(5, description="召回正例选取数量"),
+    num_prompt_examples: int = Form(5, description="提示词正向示例数（≤召回正例数，上限10）"),
+    num_interception_examples: int = Form(5, description="提示词反向示例数上限（≤去重误抽数，上限10）"),
     db: Session = Depends(get_db),
 ):
     """上传测试集 → 异步启动生成 → 立即返回 run_id。
@@ -92,9 +94,25 @@ async def generate(
             detail=f"测试集只有 {num_available} 个正例（去重后），无法生成 {num_examples} 个典型正例。请将数量调整为 ≤ {num_available}。",
         )
 
+    # 正向示例 ≤ 召回正例 + 上限 10
+    num_prompt_examples = min(num_prompt_examples, 10, num_examples)
+    # 查误抽值（从 test_cases 表）
+    from ...db.models import TestCase as TC
+    misextract_rows = (
+        db.query(TC.actual_value)
+        .filter(TC.block_code == cleaned.block_code)
+        .filter(TC.actual_value != None, TC.actual_value != "")
+        .all()
+    ) if cleaned.block_code else []
+    misextract_values = [r[0].strip() for r in misextract_rows if r[0] and r[0].strip()]
+    num_interception_examples = min(num_interception_examples, 10, len(set(misextract_values)) if misextract_values else 5)
+
     state = GenerationState(
         cleaned=cleaned, nkw=nkw, nsec=nsec, nq=nq, skip_verify=skip_verify,
         num_examples=num_examples,
+        num_prompt_examples=num_prompt_examples,
+        num_interception_examples=num_interception_examples,
+        misextract_values=misextract_values,
     )
     repo = PipelineRepository(db)
     run_id = repo.start_pipeline_run(

@@ -17,6 +17,7 @@ import jieba
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from ...schemas.cleaned_test_set import CleanedTestSet
 
@@ -232,6 +233,70 @@ def _select_diverse_indices(values: List[str], n: int = 5) -> List[int]:
 def _select_diverse(values: List[str], n: int = 5) -> List[str]:
     """聚类选 n 个互相差异最大的代表性样本（字符串），保留供 extract_keywords 等旧调用方。"""
     return [values[i] for i in _select_diverse_indices(values, n)]
+
+
+# ==================== 反例选取（误抽值去重 + 相似度排序）====================
+
+def _clean_for_similarity(text: str) -> str:
+    """剥离 markdown 表格/HTML 噪音符号，只留语义文本（TF-IDF 前调用）。"""
+    text = re.sub(r'<br\s*/?>', ' ', text)
+    text = re.sub(r'\|{2,}', ' ', text)
+    text = re.sub(r'(?<=\S)\|(?=\S)', '', text)
+    text = re.sub(r'^[-:|]+\s*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def _dedup_misextract(values: List[str], threshold: float = 0.9) -> List[str]:
+    """去重相似度 > threshold 的误抽内容，保留第一个出现的（TF-IDF cosine）。"""
+    if len(values) <= 1:
+        return list(values)
+    cleaned = [_clean_for_similarity(v) for v in values]
+    try:
+        vectorizer = TfidfVectorizer(tokenizer=lambda x: jieba.lcut(x), token_pattern=None)
+        X = vectorizer.fit_transform(cleaned)
+    except ValueError:
+        return list(dict.fromkeys(values))
+    unique_idx = [0]
+    for i in range(1, len(values)):
+        is_dup = any(cosine_similarity(X[i], X[j])[0][0] > threshold for j in unique_idx)
+        if not is_dup:
+            unique_idx.append(i)
+    return [values[i] for i in unique_idx]
+
+
+def _rank_by_confusion(misextract: List[str], positive_pool: List[str]) -> List[str]:
+    """按与正例池的最大 TF-IDF 相似度排序（越像正例 = 越危险 = 排越前）。"""
+    if not misextract:
+        return []
+    if not positive_pool:
+        return list(misextract)
+    cleaned_mis = [_clean_for_similarity(v) for v in misextract]
+    cleaned_pos = [_clean_for_similarity(v) for v in positive_pool]
+    try:
+        all_texts = cleaned_pos + cleaned_mis
+        vectorizer = TfidfVectorizer(tokenizer=lambda x: jieba.lcut(x), token_pattern=None)
+        X_all = vectorizer.fit_transform(all_texts)
+    except ValueError:
+        return list(misextract)
+    n_pos = len(cleaned_pos)
+    scored = []
+    for i, val in enumerate(misextract):
+        mis_vec = X_all[n_pos + i]
+        pos_vecs = X_all[:n_pos]
+        max_sim = cosine_similarity(mis_vec, pos_vecs).max()
+        scored.append((val, max_sim))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [v for v, _ in scored]
+
+
+def select_prompt_misextract(misextract_values: List[str], positive_pool: List[str], cap: int = 5) -> List[str]:
+    """反例选取全流程：去重 → 相似度排序 → TOP cap。"""
+    if not misextract_values:
+        return []
+    deduped = _dedup_misextract(misextract_values)
+    ranked = _rank_by_confusion(deduped, positive_pool)
+    return ranked[:cap]
 
 
 def _levenshtein(s1: str, s2: str) -> int:

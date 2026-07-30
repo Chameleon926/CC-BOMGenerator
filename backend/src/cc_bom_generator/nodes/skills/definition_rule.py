@@ -22,6 +22,7 @@ class DefinitionRuleSkill(BaseSkill):
             cleaned=state.cleaned,
             keywords=state.keywords or None,
             current_bom=self.current_bom,
+            misextract=state.selected_misextract or None,
         )
 
         state.bom = bom

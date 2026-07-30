@@ -68,6 +68,13 @@ class RuleCheckSkill(BaseSkill):
         # 4. 拦截规则 scene 分桶（不直接判 pass/fail，供人审/自检查场景盲区）
         scene_coverage = _bucket_scene_coverage(interception_rules)
 
+        # 5. 反向校验：误抽内容不应被匹配规则命中（新增）
+        misextract_check = []
+        for actual in (state.misextract_values or []):
+            matched_by = [kw for kw in match_keywords if kw and len(kw) >= 2 and kw in actual]
+            if matched_by:
+                misextract_check.append({"actual": actual[:40], "matched_by": matched_by})
+
         state.rule_check_passed = (len(killed) == 0) and (len(poison_hits) == 0)
         state.rule_check_details = {
             "interception_keywords": interception_keywords,
@@ -77,6 +84,7 @@ class RuleCheckSkill(BaseSkill):
             "scene_coverage": scene_coverage,
             "hit_rate": f"{hit}/{len(positives)} = {hit_rate:.0%}",
             "missed_examples": miss,
+            "misextract_check": misextract_check,
         }
 
         if killed:

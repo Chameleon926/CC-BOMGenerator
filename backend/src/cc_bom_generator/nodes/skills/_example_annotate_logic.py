@@ -8,7 +8,7 @@
 from __future__ import annotations
 from typing import List
 
-from ...schemas.bom import BOM, TypicalExample
+from ...schemas.bom import BOM, TypicalExample, InterceptionExample
 from .rule_check import _extract_rule_keywords
 
 
@@ -62,3 +62,25 @@ def annotate_typical_examples(
         for i, f in enumerate(ck["flags"]):
             all_flags.append(f"正例「{val[:30]}」{f}")
     return typical, all_flags
+
+
+def annotate_interception_examples(
+    values: List[str],
+    reasons: List[str],
+    bom: BOM,
+) -> tuple[List[InterceptionExample], List[str]]:
+    """组装 interception_examples + 跑反向一致性校验。
+
+    反向校验：反例内容**不应被匹配规则命中**（命中 = 规则太宽，误抽风险）。
+    """
+    from .rule_check import _extract_rule_keywords
+    interception: List[InterceptionExample] = []
+    all_flags: List[str] = []
+    match_kws = [k for k in _extract_rule_keywords(bom.extraction_rules.core_match_rules) if len(k) >= 2]
+    for val, reason in zip(values, reasons):
+        interception.append(InterceptionExample(value=val, reason=reason or ""))
+        # 反向校验：误抽内容不应被匹配规则命中
+        matched_by = [kw for kw in match_kws if kw in val]
+        if matched_by:
+            all_flags.append(f"反例「{val[:30]}」被匹配规则关键词命中：{matched_by}（规则太宽）")
+    return interception, all_flags
